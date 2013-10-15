@@ -1,5 +1,5 @@
 
-layout = "0-2-w,5-5-b,7-3-b,11-5-w,12-5-b,16-3-w,18-5-w,23-2-b"
+layout = "0-2-o,5-5-x,7-3-x,11-5-o,12-5-x,16-3-o,18-5-o,23-2-x"
 #layout = "23-0-w,18-2-w,20-2-w,0-2-b,4-1-b,5-1-b,6-1-b,7-1-b,21-1-b"
 #layout = "22-1-w,0-2-b,4-1-b,5-1-b,6-1-b,7-1-b,21-1-b"
 
@@ -11,7 +11,7 @@ import os
 
 class Game:
 
-    def __init__(self,layout=None,grid=None,symbols=None,out_pieces=None,
+    def __init__(self,layout=None,grid=None,out_pieces=None,
                  bar_pieces=None,numpieces=None):
         """
         Define a new game object
@@ -21,14 +21,12 @@ class Game:
         if grid:
             import copy
             self.grid = copy.deepcopy(grid)
-            self.symbols = symbols
             self.out_pieces = copy.deepcopy(out_pieces)
             self.bar_pieces = copy.deepcopy(bar_pieces)
             self.numpieces = copy.deepcopy(numpieces)
             return
-        self.colors = ['w','b']
+        self.colors = ['o','x']
         self.grid = [[] for _ in range(num_cols)]
-        self.symbols = {self.colors[0]:'o',self.colors[1]:'x'}
         self.out_pieces = {}
         self.bar_pieces = {}
         self.numpieces = {}
@@ -42,16 +40,16 @@ class Game:
         self.colors.reverse()
             
     def clone(self):
-        return Game(None,self.grid,self.symbols,self.out_pieces,
+        return Game(None,self.grid,self.out_pieces,
                     self.bar_pieces,self.numpieces)
 
     def new_game(self):
         for col in self.layout.split(','):
             loc,num,color = col.split('-')
-            self.grid[int(loc)] = [Piece(int(loc),color,self.symbols[color]) for _ in range(int(num))]
+            self.grid[int(loc)] = [color for _ in range(int(num))]
         for col in self.grid:
             for piece in col:
-                self.numpieces[piece.color] += 1
+                self.numpieces[piece] += 1
 
 
     def get_moves(self,roll,color):
@@ -112,14 +110,14 @@ class Game:
     def onboard_piece(self,moves,color,rolls):
         start = -1
         if color==self.colors[1]:
-            start = 24
+            start = num_cols
         piece = self.bar_pieces[color].pop()
         for r1,r2 in rolls:
-            if len(self.grid[start+r1])==0 or self.grid[start+r1][0].color==color:
+            if len(self.grid[start+r1])==0 or self.grid[start+r1][0]==color:
                 move1 = (ON,start+r1)
                 self.grid[start+r1].append(piece)
                 if self.bar_pieces[color]:
-                    if len(self.grid[start+r2])==0 or self.grid[start+r2][0].color==color:
+                    if len(self.grid[start+r2])==0 or self.grid[start+r2][0]==color:
                         move2 = (ON,start+r2)
                         moves.add((move1,move2))
                     else:
@@ -142,7 +140,7 @@ class Game:
 
         count = 0
         for i in range(start,end):
-            if len(self.grid[i])>0 and self.grid[i][0].color==color:
+            if len(self.grid[i])>0 and self.grid[i][0]==color:
                 count += len(self.grid[i])
         if count+len(self.out_pieces[color]) == self.numpieces[color]:
             return True
@@ -154,7 +152,7 @@ class Game:
             return False
         if color==self.colors[1] and start > 5:
             return False
-        if len(self.grid[start]) == 0 or self.grid[start][0].color != color:
+        if len(self.grid[start]) == 0 or self.grid[start][0] != color:
             return False
 
         if color==self.colors[1]:
@@ -162,28 +160,28 @@ class Game:
                 return True
             if start+r<-1:
                 for i in range(start+1,6):
-                    if len(self.grid[i]) != 0 and self.grid[i][0].color==self.colors[1]:
+                    if len(self.grid[i]) != 0 and self.grid[i][0]==self.colors[1]:
                         return False
                 return True
         if color==self.colors[0]:
-            if start+r == 24:
+            if start+r == num_cols:
                 return True
-            if start+r > 24:
+            if start+r > num_cols:
                 for i in range(start-1,17,-1):
-                    if len(self.grid[i]) != 0 and self.grid[i][0].color==self.colors[0]:
+                    if len(self.grid[i]) != 0 and self.grid[i][0]==self.colors[0]:
                         return False
                 return True
         return False
 
     def is_valid_move(self,start,end,color):
-        if len(self.grid[start]) > 0 and self.grid[start][0].color == color:
+        if len(self.grid[start]) > 0 and self.grid[start][0] == color:
             if end < 0 or end > 23:
                 return False
             if len(self.grid[end]) == 0:
                 return True
             if len(self.grid[end]) == 1:
                 return True
-            if len(self.grid[end])>1 and self.grid[end][0].color == color:
+            if len(self.grid[end])>1 and self.grid[end][0] == color:
                 return True
         return False
 
@@ -200,10 +198,8 @@ class Game:
             if e==OFF:
                 self.out_pieces[color].append(piece)
                 continue
-            if len(self.grid[e])>0 and self.grid[e][0].color != color:
+            if len(self.grid[e])>0 and self.grid[e][0] != color:
                 bar_piece = self.grid[e].pop()
-                bar_piece.onboard = False
-                bar_piece.onbar = True
                 self.bar_pieces[bar_piece.color].append(bar_piece)
             self.grid[e].append(piece)
 
@@ -219,16 +215,16 @@ class Game:
 
     def draw(self):
         os.system('clear')
-        largest = max([len(self.grid[i]) for i in range(12,24)])
+        largest = max([len(self.grid[i]) for i in range(12,num_cols)])
         for i in range(-2,largest):
-            for col in range(12,24):
+            for col in range(12,num_cols):
                 print "|",
                 if i==-2:
                     print str(col),
                 elif i==-1:
                     print "--",
                 elif len(self.grid[col])>i:
-                    print " "+self.grid[col][i].symbol,
+                    print " "+self.grid[col][i],
                 else:
                     print "  ",
             print "|"
@@ -245,31 +241,20 @@ class Game:
                 elif i==-1:
                     print "--",
                 elif len(self.grid[col])>i:
-                    print " "+self.grid[col][i].symbol,
+                    print " "+self.grid[col][i],
                 else:
                     print "  ",
             print "|"
         pnum = 0
         for c in self.colors:
-            print "<Player %d - %s>  Off Board : "%(pnum,self.symbols[c]),
+            print "<Player %d - %s>  Off Board : "%(pnum,c),
             for piece in self.out_pieces[c]:
-                print piece.symbol+'',
+                print c+'',
             print "   Bar : ",
             for piece in self.bar_pieces[c]:
-                print piece.symbol+'',
+                print c+'',
             print
             pnum+=1
-
-class Piece:
-    def __init__(self,loc,color,symbol):
-        """
-        Define a piece object
-        """
-        self.loc = loc
-        self.color = color
-        self.onboard = True
-        self.onbar = False
-        self.symbol = symbol
 
 if __name__=='__main__':
     g = Game(layout)

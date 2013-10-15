@@ -6,9 +6,9 @@ def run_game():
     g.new_game()
     g.draw()
     
-    players = [player.HumanPlayer(g.colors[0],0), player.RandomPlayer(g.colors[1],1)]
+    players = [player.HumanPlayer(g.colors[0],0), player.HumanPlayer(g.colors[1],1)]
     
-    playernum = 0
+    playernum = -1
     over = False
     while not over:
         playernum = (playernum+1)%2
@@ -22,6 +22,7 @@ def turn(player,g):
     roll = roll_dice()
     print "Player %d rolled <"%player.num+str(roll[0])+", "+str(roll[1])+">"
     moves = g.get_moves(roll,player.color)
+    print moves
     move = player.take_turn(moves)
     if move:
         g.take_turn(move,player.color)
