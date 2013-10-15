@@ -53,48 +53,6 @@ class Game:
             for piece in col:
                 self.numpieces[piece.color] += 1
 
-    def draw(self):
-        os.system('clear')
-        largest = max([len(self.grid[i]) for i in range(12,24)])
-        for i in range(-2,largest):
-            for col in range(12,24):
-                print "|",
-                if i==-2:
-                    print str(col),
-                elif i==-1:
-                    print "--",
-                elif len(self.grid[col])>i:
-                    print " "+self.grid[col][i].symbol,
-                else:
-                    print "  ",
-            print "|"
-        print
-        print
-        largest = max([len(self.grid[i]) for i in range(12)])
-        for i in range(largest-1,-3,-1):
-            for col in range(11,-1,-1):
-                print "|",
-                if i==-2:
-                    if col<10:
-                        print "",
-                    print str(col),
-                elif i==-1:
-                    print "--",
-                elif len(self.grid[col])>i:
-                    print " "+self.grid[col][i].symbol,
-                else:
-                    print "  ",
-            print "|"
-        pnum = 1
-        for c in self.colors:
-            print "<Player %d - %s>  Off Board : "%(pnum,self.symbols[c]),
-            for piece in self.out_pieces[c]:
-                print piece.symbol+'',
-            print "   Bar : ",
-            for piece in self.bar_pieces[c]:
-                print piece.symbol+'',
-            print
-            pnum+=1
 
     def get_moves(self,roll,color):
         """
@@ -113,48 +71,43 @@ class Game:
             self.onboard_piece(moves,color,rolls)
             return moves
 
+        offboarding = self.can_offboard(color)
+
         for r1,r2 in rolls:
             for i in range(num_cols):
                 if self.is_valid_move(i,i+r1,color):
                     move1 = (i,i+r1)
                     piece = self.grid[i].pop()
                     self.grid[i+r1].append(piece)
-                    for j in range(num_cols):
-                        if self.can_offboard(color) and self.remove_piece(color,j,r2):
-                            move2 = (j,OFF)
-                            moves.add((move1,move2))
-                            
-                        if self.is_valid_move(j,j+r2,color):
-                            move2 = (j,j+r2)
-                            moves.add((move1,move2))
+                    self.get_second_move(color,r2,moves,move1,offboarding)
                     self.grid[i+r1].pop()
                     self.grid[i].append(piece)
 
-        if self.can_offboard(color):
-            for r1,r2 in rolls:
-                for i in range(num_cols):
-                    if self.remove_piece(color,i,r1):
-                        piece = self.grid[i].pop()
-                        move1 = (i,OFF)
-                        for j in range(num_cols):
-                            if self.remove_piece(color,j,r2):
-                                move2 = (j,OFF)
-                                moves.add((move1,move2))
-                            if self.is_valid_move(j,j+r2,color):
-                                move2 = (j,j+r2)
-                                moves.add((move1,move2))
-                        if len(self.out_pieces[color])==self.numpieces[color]-1:
-                            moves.add((move1,))
-                        self.grid[i].append(piece)
+                if offboarding and self.remove_piece(color,i,r1):
+                    move1 = (i,OFF)
+                    piece = self.grid[i].pop()
+                    self.get_second_move(color,r2,moves,move1,offboarding)
+                    if len(self.out_pieces[color])==self.numpieces[color]-1:
+                        moves.add((move1,))
+                    self.grid[i].append(piece)
 
         r = sum(rolls[0])
         for i in range(num_cols):
             if self.is_valid_move(i,i+r,color):
                 move = (i,i+r)
                 moves.add((move,))
-            
         
         return moves
+
+    def get_second_move(self,color,r2,moves,move1,offboarding):
+        for j in range(num_cols):
+            if offboarding and self.remove_piece(color,j,r2):
+                move2 = (j,OFF)
+                moves.add((move1,move2))
+                
+            if self.is_valid_move(j,j+r2,color):
+                move2 = (j,j+r2)
+                moves.add((move1,move2))
 
     def onboard_piece(self,moves,color,rolls):
         start = -1
@@ -256,14 +209,56 @@ class Game:
 
     def is_over(self):
         """
-        Checks if the game is over and returns True,winner
-        or False,None if not over.
+        Checks if the game is over.
         """
         for c in self.colors:
             if len(self.out_pieces[c])==self.numpieces[c]:
                 return True
 
         return False
+
+    def draw(self):
+        os.system('clear')
+        largest = max([len(self.grid[i]) for i in range(12,24)])
+        for i in range(-2,largest):
+            for col in range(12,24):
+                print "|",
+                if i==-2:
+                    print str(col),
+                elif i==-1:
+                    print "--",
+                elif len(self.grid[col])>i:
+                    print " "+self.grid[col][i].symbol,
+                else:
+                    print "  ",
+            print "|"
+        print
+        print
+        largest = max([len(self.grid[i]) for i in range(12)])
+        for i in range(largest-1,-3,-1):
+            for col in range(11,-1,-1):
+                print "|",
+                if i==-2:
+                    if col<10:
+                        print "",
+                    print str(col),
+                elif i==-1:
+                    print "--",
+                elif len(self.grid[col])>i:
+                    print " "+self.grid[col][i].symbol,
+                else:
+                    print "  ",
+            print "|"
+        pnum = 0
+        for c in self.colors:
+            print "<Player %d - %s>  Off Board : "%(pnum,self.symbols[c]),
+            for piece in self.out_pieces[c]:
+                print piece.symbol+'',
+            print "   Bar : ",
+            for piece in self.bar_pieces[c]:
+                print piece.symbol+'',
+            print
+            pnum+=1
 
 class Piece:
     def __init__(self,loc,color,symbol):
