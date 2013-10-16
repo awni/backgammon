@@ -1,5 +1,6 @@
 
 layout = "0-2-o,5-5-x,7-3-x,11-5-o,12-5-x,16-3-o,18-5-o,23-2-x"
+#layout = "0-1-o,5-2-x,7-1-x,11-3-o,12-3-x,16-1-o,18-2-o,23-2-x"
 #layout = "23-0-w,18-2-w,20-2-w,0-2-b,4-1-b,5-1-b,6-1-b,7-1-b,21-1-b"
 #layout = "22-1-w,0-2-b,4-1-b,5-1-b,6-1-b,7-1-b,21-1-b"
 
@@ -17,7 +18,7 @@ class Game:
         Define a new game object
         """
         self.layout = layout
-
+        self.colors = ['o','x']
         if grid:
             import copy
             self.grid = copy.deepcopy(grid)
@@ -25,7 +26,6 @@ class Game:
             self.bar_pieces = copy.deepcopy(bar_pieces)
             self.numpieces = copy.deepcopy(numpieces)
             return
-        self.colors = ['o','x']
         self.grid = [[] for _ in range(num_cols)]
         self.out_pieces = {}
         self.bar_pieces = {}
@@ -58,38 +58,35 @@ class Game:
         """
         moves = set()
 
-        rolls = [roll]
-        if roll[0]!=roll[1]:
-            rolls.append((roll[1],roll[0]))
+        r1,r2 = roll
         if color == self.colors[1]:
-            newrolls = [(-r1,-r2) for r1,r2 in rolls]
-            rolls = newrolls
+            r1,r2 = -r1,-r2
 
         if self.bar_pieces[color]:
-            self.onboard_piece(moves,color,rolls)
+            self.onboard_piece(moves,color,r1,r2)
+            self.onboard_piece(moves,color,r2,r1)
             return moves
 
         offboarding = self.can_offboard(color)
 
-        for r1,r2 in rolls:
-            for i in range(num_cols):
-                if self.is_valid_move(i,i+r1,color):
-                    move1 = (i,i+r1)
-                    piece = self.grid[i].pop()
-                    self.grid[i+r1].append(piece)
-                    self.get_second_move(color,r2,moves,move1,offboarding)
-                    self.grid[i+r1].pop()
-                    self.grid[i].append(piece)
+        for i in range(num_cols):
+            if self.is_valid_move(i,i+r1,color):
+                move1 = (i,i+r1)
+                piece = self.grid[i].pop()
+                self.grid[i+r1].append(piece)
+                self.get_second_move(color,r2,moves,move1,offboarding)
+                self.grid[i+r1].pop()
+                self.grid[i].append(piece)
 
-                if offboarding and self.remove_piece(color,i,r1):
-                    move1 = (i,OFF)
-                    piece = self.grid[i].pop()
-                    self.get_second_move(color,r2,moves,move1,offboarding)
-                    if len(self.out_pieces[color])==self.numpieces[color]-1:
-                        moves.add((move1,))
-                    self.grid[i].append(piece)
+            if offboarding and self.remove_piece(color,i,r1):
+                move1 = (i,OFF)
+                piece = self.grid[i].pop()
+                self.get_second_move(color,r2,moves,move1,offboarding)
+                if len(self.out_pieces[color])==self.numpieces[color]-1:
+                    moves.add((move1,))
+                self.grid[i].append(piece)
 
-        r = sum(rolls[0])
+        r = r1+r1
         for i in range(num_cols):
             if self.is_valid_move(i,i+r,color):
                 move = (i,i+r)
@@ -107,27 +104,26 @@ class Game:
                 move2 = (j,j+r2)
                 moves.add((move1,move2))
 
-    def onboard_piece(self,moves,color,rolls):
+    def onboard_piece(self,moves,color,r1,r2):
         start = -1
         if color==self.colors[1]:
             start = num_cols
         piece = self.bar_pieces[color].pop()
-        for r1,r2 in rolls:
-            if len(self.grid[start+r1])==0 or self.grid[start+r1][0]==color:
-                move1 = (ON,start+r1)
-                self.grid[start+r1].append(piece)
-                if self.bar_pieces[color]:
-                    if len(self.grid[start+r2])==0 or self.grid[start+r2][0]==color:
-                        move2 = (ON,start+r2)
-                        moves.add((move1,move2))
-                    else:
-                        moves.add((move1,))
+        if len(self.grid[start+r1])<=1 or self.grid[start+r1][0]==color:
+            move1 = (ON,start+r1)
+            self.grid[start+r1].append(piece)
+            if self.bar_pieces[color]:
+                if len(self.grid[start+r2])<=1 or self.grid[start+r2][0]==color:
+                    move2 = (ON,start+r2)
+                    moves.add((move1,move2))
                 else:
-                    for j in range(num_cols):
-                        if self.is_valid_move(j,j+r2,color):
-                            move2 = (j,j+r2)
-                            moves.add((move1,move2))
-                self.grid[start+r1].pop()
+                    moves.add((move1,))
+            else:
+                for j in range(num_cols):
+                    if self.is_valid_move(j,j+r2,color):
+                        move2 = (j,j+r2)
+                        moves.add((move1,move2))
+            self.grid[start+r1].pop()
         self.bar_pieces[color].append(piece)
 
     def can_offboard(self,color):
@@ -200,7 +196,7 @@ class Game:
                 continue
             if len(self.grid[e])>0 and self.grid[e][0] != color:
                 bar_piece = self.grid[e].pop()
-                self.bar_pieces[bar_piece.color].append(bar_piece)
+                self.bar_pieces[bar_piece].append(bar_piece)
             self.grid[e].append(piece)
 
     def is_over(self):
@@ -260,7 +256,3 @@ if __name__=='__main__':
     g = Game(layout)
     g.new_game()
     g.draw()
-
-
-
-    

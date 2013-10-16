@@ -1,24 +1,29 @@
 import random
-import game as gameMod
-OFF = gameMod.OFF
-ON = gameMod.ON
+import game as gamemod
+import numpy as np
+
+
+OFF = gamemod.OFF
+ON = gamemod.ON
 
 class Player:
     def __init__(self,color,num):
         self.color = color
         self.num = num
     
-    def take_turn(self,game):
+    def take_turn(self,moves,game=None):
         raise NotImplementedError("Override me")
 
 class RandomPlayer(Player):
-    def take_turn(self,moves):
-        return random.choice(list(moves))
+    def take_turn(self,moves,game=None):
+        if moves:
+            return random.choice(list(moves))
+        return None
         
 
 class HumanPlayer(Player):
 
-    def take_turn(self,moves):
+    def take_turn(self,moves,game=None):
         while True:
             if not moves:
                 raw_input("No moves for you...(hit enter)")
@@ -49,6 +54,9 @@ class HumanPlayer(Player):
 
             if move in moves:
                 break
+            elif move[::-1] in moves:
+                move = move[::-1]
+                break
             else:
                 print "You can't play that move"
 
@@ -66,3 +74,29 @@ class HumanPlayer(Player):
             return (start,end)
         except:
             return False
+
+class NNPlayer(Player, object):
+    
+    def __init__(self,color,num,weights):
+        super(self.__class__,self).__init__(color,num)
+        self.w1,self.w2,self.b1,self.b2 = weights
+
+    def take_turn(self,moves,game):
+        move = None
+        bestScore = 0
+        for m in list(moves):
+            
+            # take the move
+            tmpGame = game.clone()
+            tmpGame.take_turn(m,self.color)
+
+            # evaluate the state
+            features = np.array(extract_features(tmpGame)).reshape(-1,1)
+            hiddenAct = 1/(1+np.exp(-(self.w1.dot(features)+self.b1)))
+            pred = 1/(1+np.exp(-(self.w2.dot(hiddenAct)+self.b2)))
+            if pred>bestScore:
+                move = m
+                bestScore = pred
+        return move
+
+from submission import extract_features
