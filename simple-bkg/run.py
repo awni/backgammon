@@ -15,7 +15,7 @@ def train():
 
         g = game.Game(game.layout)
         players = [submission.TDPlayer(g.colors[0],0,weights,gamma), 
-                  player.NNPlayer(g.colors[1],1,weights)]
+                  player.ReflexPlayer(g.colors[1],1,submission.nnEvaluate,weights)]
         winner = run_game(players,g)
         if it%10 == 0:
             print "iteration : %d"%it
