@@ -102,11 +102,12 @@ def main(args=None):
                       default="random",help="Choose type of first player")
     parser.add_option("-q","--player2",dest="player2",
                       default="random",help="Choose type of second player")
-    pasrser.add_options("-e","--eval",dest="eval",default="simple",
+    parser.add_option("-e","--eval",dest="eval",default="simple",
                         help="Choose eval function for player if relevant")
 
     (opts,args) = parser.parse_args(args)    
 
+    weights = None
     if opts.train:
         weights = train()
         
