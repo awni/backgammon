@@ -24,6 +24,24 @@ def extract_features(game):
         features.append(float(len(game.out_pieces[color]))/game.numpieces[color])
     return features
 
+def nnEvaluate(game,weights):
+    w1,w2,b1,b2 = weights
+    features = np.array(extract_features(game)).reshape(-1,1)
+    hiddenAct = 1/(1+np.exp(-(w1.dot(features)+b1)))
+    score = 1/(1+np.exp(-(w2.dot(hiddenAct)+b2)))
+    return score
+
+def simpleEvaluate(game,color):
+    numSingletons = 0
+    for col in game.grid:
+        if len(col)==1 and col[0]==color:
+            numSingletons += 1
+
+    score = 5.*len(game.out_pieces[color])
+    score -= 0.5*len(game.bar_pieces[color]) 
+    score -= 0.5*numSingletons
+    return score
+
 class TDPlayer(player.Player, object):
     
     def __init__(self,color,num,weights,gamma):
@@ -74,41 +92,3 @@ class TDPlayer(player.Player, object):
                 gradsum += self.gamma*gradsum+grad
                 update += currdiff*gradsum
         return updates
-
-class TDExpectiMaxPlayer(player.Player, object):
-    
-    def __init__(self,color,num,weights):
-        super(self.__class__,self).__init__(color,num)
-        self.w1,self.w2,self.b1,self.b2 = weights
-
-    def evaluate(self,game):
-        features = np.array(extract_features(game)).reshape(-1,1)
-        hiddenAct = 1/(1+np.exp(-(self.w1.dot(features)+self.b1)))
-        score = 1/(1+np.exp(-(self.w2.dot(hiddenAct)+self.b2)))
-        return score
-      
-    def take_turn(self,moves,game,depth=1):
-        if depth==0:
-            return self.evaluate(game)
-        move = None
-        bestScore = 0
-        for m in list(moves):
-            tmpGame = game.clone()
-            tmpGame.take_turn(m,self.color)
-            score = self.expecti(tmpGame,depth,'x')
-            if score>bestScore:
-                move = m
-                bestScore = score
-        return move
-        
-    def expecti(self,game,depth,color):
-        total = 0
-        for i in range(1,6):
-            for j in range(i,6):
-                moves = game.get_moves((i,j),color)
-                for m in moves:
-                    tmpGame = game.clone()
-                    tmpGame.take_turn(m,color)
-                    total += self.take_turn(None,tmpGame,depth-1)
-
-        return total/(5.*6./2.)

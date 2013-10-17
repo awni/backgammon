@@ -37,14 +37,13 @@ def train():
     fid.close()
     return weights
 
-def test(weights,numGames=100):
+def test(players,numGames=100,draw=False):
     winners = [0,0]
     for _ in xrange(numGames):
         g = game.Game(game.layout)
-        players = [submission.TDExpectiMaxPlayer(g.colors[0],0,weights), 
-                   player.RandomPlayer(g.colors[1],1)]
-        winner = run_game(players,g)
-        print winner
+        winner = run_game(players,g,draw)
+        if draw:
+            print "The winner is : Player %d"%winner
         winners[winner]+=1
     print winners
 
@@ -79,7 +78,7 @@ def run_game(players,g,draw=False):
     return players[playernum].num
 
 def turn(player,g):
-    roll = roll_dice()
+    roll = roll_dice(g)
     moves = g.get_moves(roll,player.color)
     if moves:
         move = player.take_turn(moves,g)
@@ -88,13 +87,36 @@ def turn(player,g):
     if move:
         g.take_turn(move,player.color)
 
-def roll_dice():
-    return (random.randint(1,game.quad), random.randint(1,game.quad))
+def roll_dice(g):
+    return (random.randint(1,g.die), random.randint(1,g.die))
+
+def main(args=None):
+    from optparse import OptionParser
+    usage = "usage: %prog [options]"
+    parser = OptionParser(usage=usage)
+    parser.add_option("-t","--train", dest="train",action="store_true",
+                      default=False,help="Train TD Player")
+    parser.add_option("-d","--draw",dest="draw",action="store_true",default=False,
+                      help="Draw game")
+    parser.add_option("-n","--num",dest="numgames",default=1,help="Num games to play")
+    parser.add_option("-p","--player1",dest="player1",
+                      default="random",help="Choose type of first player")
+    parser.add_option("-q","--player2",dest="player2",
+                      default="random",help="Choose type of second player")
+
+    (opts,args) = parser.parse_args(args)    
+    if opts.train:
+        weights = train()
+        players = [submission.TDExpectiMaxPlayer(g.colors[0],0,weights), 
+                   player.RandomPlayer(g.colors[1],1)]
+    
+    players = [player.ExpectiMaxPlayer(game.colors[0],0), 
+               player.RandomPlayer(game.colors[1],1)]
+    
+    test(players,numGames=int(opts.numgames),draw=opts.draw)
 
 if __name__=="__main__":
     ## TODO opts parer
-    
-    weights = train()
-    test(weights)
+    main()
 
 

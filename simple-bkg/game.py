@@ -3,7 +3,7 @@
 #layout = "0-2-o,4-2-x,6-2-x,9-2-o,10-2-x,13-2-o,15-2-o,19-2-x"
 layout = "0-1-o,3-2-x,5-2-o,8-2-o,7-2-x,10-2-x,12-2-o,15-1-x"
 #layout = "0-6-x,1-1-x,14-2-o,15-4-o"
-
+colors = ['o','x']
 num_cols = 16
 quad = 4
 OFF = 'off'
@@ -18,6 +18,7 @@ class Game:
         """
         Define a new game object
         """
+        self.die = quad
         self.layout = layout
         self.colors = ['o','x']
         if grid:
@@ -43,6 +44,11 @@ class Game:
     def clone(self):
         return Game(None,self.grid,self.out_pieces,
                     self.bar_pieces,self.numpieces)
+    
+    def opponent(self,color):
+        for c in self.colors:
+            if c!= color: return color
+
 
     def new_game(self):
         for col in self.layout.split(','):
@@ -51,7 +57,6 @@ class Game:
         for col in self.grid:
             for piece in col:
                 self.numpieces[piece] += 1
-        
 
     def get_moves(self,roll,color):
         """
@@ -62,11 +67,6 @@ class Game:
         r1,r2 = roll
         if color == self.colors[1]:
             r1,r2 = -r1,-r2
-
-       #if self.bar_pieces[color]:
-         #self.onboard_piece(moves,color,r1,r2)
-         #self.onboard_piece(moves,color,r2,r1)
-         #return moves
         
         offboarding = self.can_offboard(color)
         for i in range(num_cols):
@@ -115,28 +115,6 @@ class Game:
                 move2 = (j,j+r2)
                 moves.add((move1,move2))
 
-    def onboard_piece(self,moves,color,r1,r2):
-        start = -1
-        if color==self.colors[1]:
-            start = num_cols
-        piece = self.bar_pieces[color].pop()
-        if len(self.grid[start+r1])<=1 or self.grid[start+r1][0]==color:
-            move1 = (ON,start+r1)
-            self.grid[start+r1].append(piece)
-            if self.bar_pieces[color]:
-                if len(self.grid[start+r2])<=1 or self.grid[start+r2][0]==color:
-                    move2 = (ON,start+r2)
-                    moves.add((move1,move2))
-                else:
-                    moves.add((move1,))
-            else:
-                for j in range(num_cols):
-                    if self.is_valid_move(j,j+r2,color):
-                        move2 = (j,j+r2)
-                        moves.add((move1,move2))
-            self.grid[start+r1].pop()
-        self.bar_pieces[color].append(piece)
-
     def can_offboard(self,color):
         if color==self.colors[1]:
             start=0
@@ -152,7 +130,6 @@ class Game:
         if count+len(self.out_pieces[color])+len(self.bar_pieces[color]) == self.numpieces[color]:
             return True
         return False
-
 
     def remove_piece(self,color,start,r):
         if color==self.colors[0] and start < num_cols-quad:
