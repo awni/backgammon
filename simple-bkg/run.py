@@ -2,7 +2,7 @@
 import game, player, random, submission
 import numpy as np
 
-def train(maxIter=5000):
+def train(maxIter=10000):
     gamma = 0.7
     alpha = 1e-1
     numFeats = game.num_cols*2*3+6
