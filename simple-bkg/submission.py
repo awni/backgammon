@@ -38,8 +38,8 @@ def simpleEvaluate(game,color):
             numSingletons += 1
 
     score = 5.*len(game.out_pieces[color])
-    score -= 0.5*len(game.bar_pieces[color]) 
-    score -= 0.5*numSingletons
+#    score -= 0.5*len(game.bar_pieces[color]) 
+#    score -= 0.5*numSingletons
     return score
 
 class TDPlayer(player.Player, object):

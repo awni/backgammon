@@ -7,7 +7,7 @@ def train():
     alpha = .1
     numFeats = game.num_cols*2*3+4
     numHidden = 30
-    maxIter = 2000
+    maxIter = 10000
     weights = [1e-2*np.random.randn(numHidden,numFeats),1e-2*np.random.randn(1,numHidden),
                np.zeros((numHidden,1)),np.zeros((1,1))]
 
@@ -42,8 +42,7 @@ def test(players,numGames=100,draw=False):
     for _ in xrange(numGames):
         g = game.Game(game.layout)
         winner = run_game(players,g,draw)
-        if draw:
-            print "The winner is : Player %d"%winner
+        print "The winner is : Player %d"%winner
         winners[winner]+=1
     print winners
 
@@ -110,10 +109,26 @@ def main(args=None):
         players = [submission.TDExpectiMaxPlayer(g.colors[0],0,weights), 
                    player.RandomPlayer(g.colors[1],1)]
     
-    players = [player.ExpectiMaxPlayer(game.colors[0],0), 
-               player.RandomPlayer(game.colors[1],1)]
+    p1 = None
+    p2 = None
+    if opts.player1 == 'random':
+        p1 = player.RandomPlayer(game.colors[0],0)
+    if opts.player1 == 'reflex':
+        p1 = player.ReflexPlayer(game.colors[0],0,submission.simpleEvaluate,game.colors[0])
+    if opts.player1 == 'expectimax':
+        p1 = player.ExpectiMaxPlayer(game.colors[0],0,submission.simpleEvaluate,game.colors[0])
+    if opts.player1 == 'human':
+        p1 = player.HumanPlayer(game.colors[0],0)
+
+    if opts.player2 == 'random':
+        p2 = player.RandomPlayer(game.colors[1],1)
+
+    if p1 is None or p2 is None:
+        print "Please specify legitimate player"
+        import sys
+        sys.exit(1)
     
-    test(players,numGames=int(opts.numgames),draw=opts.draw)
+    test([p1,p2],numGames=int(opts.numgames),draw=opts.draw)
 
 if __name__=="__main__":
     ## TODO opts parer

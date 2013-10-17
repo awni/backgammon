@@ -21,23 +21,61 @@ class RandomPlayer(Player):
         return None
         
 
-class ReflexPlayer(Player):
+class ReflexPlayer(Player,object):
+    
+    def __init__(self,color,num,evalFn,evalArgs=None):
+        super(self.__class__,self).__init__(color,num)
+        self.evalFn = evalFn
+        self.evalArgs = evalArgs
+
     def take_turn(self,moves,game):
         """
         Simple Reflex Player - evaluates move as 
         score = 5*outPieces - barPieces - singletons
         """
-        bestScore = -game.numpieces[self.color] #lowest possible score
+        bestScore = float("-inf")
         move = None
         for m in list(moves):
             tmpGame = game.clone()
             tmpGame.take_turn(m,self.color)
-
-            score = submission.simpleEvaluate(game,self.color)
+            score = self.evalFn(game,self.evalArgs)
             if score > bestScore:
                 bestScore = score
                 move = m
         return move
+
+class ExpectiMaxPlayer(Player,object):
+    
+    def __init__(self,color,num,evalFn,evalArgs=None):
+        super(self.__class__,self).__init__(color,num)
+        self.evalFn = evalFn
+        self.evalArgs = evalArgs
+
+    def take_turn(self,moves,game,depth=1):
+        if depth==0:
+            return self.evalFn(game,self.evalArgs)
+        move = None
+        bestScore = float("-inf")
+        for m in list(moves):
+            tmpGame = game.clone()
+            tmpGame.take_turn(m,self.color)
+            score = self.expecti(tmpGame,depth,game.opponent(self.color))
+            if score>bestScore:
+                move = m
+                bestScore = score
+        return move
+        
+    def expecti(self,game,depth,color):
+        total = 0
+        for i in range(game.die):
+            for j in range(i,game.die+1):
+                moves = game.get_moves((i,j),color)
+                for m in moves:
+                    tmpGame = game.clone()
+                    tmpGame.take_turn(m,color)
+                    total += self.take_turn(None,tmpGame,depth-1)
+
+        return total/(game.die*(game.die+1)/2.)
             
     
 class HumanPlayer(Player):
@@ -93,63 +131,3 @@ class HumanPlayer(Player):
             return (start,end)
         except:
             return False
-
-class ExpectiMaxPlayer(Player,object):
-    
-    def __init__(self,color,num,evalFn,extraArgs=None):
-        super(self.__class__,self).__init__(color,num)
-        self.evalFn = evalFn
-        self.extraArgs = extraArgs
-
-    def take_turn(self,moves,game,depth=1):
-        if depth==0:
-            if extraArgs: return self.EvalFn(game,extraArgs)
-            return self.EvalFn(game)
-        move = None
-        bestScore = 0
-        for m in list(moves):
-            tmpGame = game.clone()
-            tmpGame.take_turn(m,self.color)
-            score = self.expecti(tmpGame,depth,game.opponent[self.color])
-            if score>bestScore:
-                move = m
-                bestScore = score
-        return move
-        
-    def expecti(self,game,depth,color):
-        total = 0
-        for i in range(game.die):
-            for j in range(i,game.die+1):
-                moves = game.get_moves((i,j),color)
-                for m in moves:
-                    tmpGame = game.clone()
-                    tmpGame.take_turn(m,color)
-                    total += self.take_turn(None,tmpGame,depth-1)
-
-        return total/(game.die*(game.die+1)/2.)
-
-class NNPlayer(Player, object):
-    
-    def __init__(self,color,num,weights):
-        super(self.__class__,self).__init__(color,num)
-        self.w1,self.w2,self.b1,self.b2 = weights
-
-    def take_turn(self,moves,game):
-        move = None
-        bestScore = 0
-        for m in list(moves):
-            
-            # take the move
-            tmpGame = game.clone()
-            tmpGame.take_turn(m,self.color)
-
-            # evaluate the state
-            features = np.array(submission.extract_features(tmpGame)).reshape(-1,1)
-            hiddenAct = 1/(1+np.exp(-(self.w1.dot(features)+self.b1)))
-            pred = 1/(1+np.exp(-(self.w2.dot(hiddenAct)+self.b2)))
-            if pred>bestScore:
-                move = m
-                bestScore = pred
-        return move
-
-import submission
