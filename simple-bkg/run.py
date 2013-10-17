@@ -102,11 +102,29 @@ def main(args=None):
                       default="random",help="Choose type of first player")
     parser.add_option("-q","--player2",dest="player2",
                       default="random",help="Choose type of second player")
+    pasrser.add_options("-e","--eval",dest="eval",default="simple",
+                        help="Choose eval function for player if relevant")
 
     (opts,args) = parser.parse_args(args)    
 
     if opts.train:
         weights = train()
+        
+    if opts.eval == "nn":
+        if not weights:
+            try:
+                fid = open('weights.npy','r')
+            except IOError:
+                print "You need to train weights to use nn player"
+                import sys
+                sys.exit(1)
+            import pickle
+            weights = pickle.load(fid)
+        evalFn = submission.nnEvaluate
+        evalArgs = weights
+    else:
+        evalFn = submission.simpleEvaluate
+        evalArgs = game.colors[0]
         
     
     p1 = None
@@ -114,9 +132,9 @@ def main(args=None):
     if opts.player1 == 'random':
         p1 = player.RandomPlayer(game.colors[0],0)
     if opts.player1 == 'reflex':
-        p1 = player.ReflexPlayer(game.colors[0],0,submission.simpleEvaluate,game.colors[0])
+        p1 = player.ReflexPlayer(game.colors[0],0,evalFn,evalArgs)
     if opts.player1 == 'expectimax':
-        p1 = player.ExpectiMaxPlayer(game.colors[0],0,submission.simpleEvaluate,game.colors[0])
+        p1 = player.ExpectiMaxPlayer(game.colors[0],0,evalFn,evalArgs)
     if opts.player1 == 'human':
         p1 = player.HumanPlayer(game.colors[0],0)
 
