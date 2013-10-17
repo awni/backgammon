@@ -7,7 +7,7 @@ def train():
     alpha = .1
     numFeats = game.num_cols*2*3+4
     numHidden = 30
-    maxIter = 10000
+    maxIter = 1000
     weights = [1e-2*np.random.randn(numHidden,numFeats),1e-2*np.random.randn(1,numHidden),
                np.zeros((numHidden,1)),np.zeros((1,1))]
 
@@ -28,7 +28,7 @@ def train():
 
         updates = players[0].compute_update(outcome)
         for w,update in zip(weights,updates):
-            w = w-alpha*update
+            w += alpha*update
 
     # save weights
     fid = open("weights.npy",'w')
