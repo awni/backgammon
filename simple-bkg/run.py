@@ -19,8 +19,6 @@ def train():
         winner = run_game(players,g)
         if it%10 == 0:
             print "iteration : %d"%it
-        #update if we lose
-        #print "Winner is player %d"%(winner)
 
         # flip outcome for training
         if winner==0:
@@ -31,6 +29,8 @@ def train():
         updates = players[0].compute_update(outcome)
         for w,update in zip(weights,updates):
             w = w-alpha*update
+
+    # save weights
     fid = open("weights.npy",'w')
     import pickle
     pickle.dump(weights,fid)
@@ -104,10 +104,10 @@ def main(args=None):
                       default="random",help="Choose type of second player")
 
     (opts,args) = parser.parse_args(args)    
+
     if opts.train:
         weights = train()
-        players = [submission.TDExpectiMaxPlayer(g.colors[0],0,weights), 
-                   player.RandomPlayer(g.colors[1],1)]
+        
     
     p1 = None
     p2 = None
