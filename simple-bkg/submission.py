@@ -1,7 +1,7 @@
 import player
 import numpy as np
 
-def get_col_feats(column,color):
+def featsForColumn(column,color):
     feats = [0.]*3
     if len(column)>0 and column[0]==color:
         for i in range(len(column)):
@@ -9,91 +9,110 @@ def get_col_feats(column,color):
     feats[-1] = feats[-1]/2.0
     return feats
             
-def extract_features(game):
+def extractFeatures(game,color):
     """
     @params game: state of backgammon board
     
     @returns features: list of real valued features
     """
     features = []
-    for color in game.colors:
+    for c in game.colors:
         for col in game.grid:
-            feats = get_col_feats(col,color)
+            feats = featsForColumn(col,c)
             features += feats
-        features.append(float(len(game.bar_pieces[color]))/2)
-        features.append(float(len(game.out_pieces[color]))/game.numpieces[color])
+        features.append(float(len(game.bar_pieces[c]))/2)
+        features.append(float(len(game.out_pieces[c]))/game.numpieces[c])
+    if color == game.colors[0]:
+        features += [1.,0.] # player 0
+    else:
+        features += [0.,1.]
     return features
 
-def nnEvaluate(game,weights):
+def nnEvaluate(game,color,weights,backprop=False):
     w1,w2,b1,b2 = weights
-    features = np.array(extract_features(game)).reshape(-1,1)
-    hiddenAct = 1/(1+np.exp(-(w1.dot(features)+b1)))
-    score = 1/(1+np.exp(-(w2.dot(hiddenAct)+b2)))
-    return score
+    features = np.array(extractFeatures(game,color)).reshape(-1,1)
+    hidden = 1/(1+np.exp(-(w1.dot(features)+b1)))
+    v = 1/(1+np.exp(-(w2.dot(hidden)+b2)))
+    if backprop:
+        del2 = v*(1-v)
+        del1 = w2.T*del2*hidden*(1-hidden)
+        return v,[del1*features.T,del2*hidden.T,del1,del2]
+    return v
 
-def simpleEvaluate(game,color):
+def computeUpdate(v,vnext,gamma,grads,traces):
+    valdiff = vnext-v
+    updates = []
+    newTraces = []
+    for trace,grad in zip(traces,grads):
+        trace = gamma*trace+grad
+        update = valdiff*trace
+        updates.append(update)
+        newTraces.append(trace)
+    return updates,newTraces
+
+def simpleEvaluate(game,color,evalArgs=None):
     numSingletons = 0
     for col in game.grid:
         if len(col)==1 and col[0]==color:
             numSingletons += 1
 
     score = 5.*len(game.out_pieces[color])
-#    score -= 0.5*len(game.bar_pieces[color]) 
-#    score -= 0.5*numSingletons
+    #score += -0.5*len(game.bar_pieces[color]) 
+    #score += 0.5*numSingletons
     return score
 
-class TDPlayer(player.Player, object):
-    
-    def __init__(self,color,num,weights,gamma):
+
+class ReflexPlayer(player.Player,object):
+
+    def __init__(self,color,num,evalFn,evalArgs=None):
         super(self.__class__,self).__init__(color,num)
-        self.w1,self.w2,self.b1,self.b2 = weights
-        self.V = []
-        self.grads = []
-        self.gamma = gamma 
+        self.evalFn = evalFn
+        self.evalArgs = evalArgs
 
     def take_turn(self,moves,game):
         move = None
-        bestScore = 0
-        worstScore = 1
+        bestVal = float("-inf")
         for m in moves:
-            
-            # take the move
             tmpGame = game.clone()
             tmpGame.take_turn(m,self.color)
-
-            # evaluate the state
-            features = np.array(extract_features(tmpGame)).reshape(-1,1)
-            hiddenAct = 1/(1+np.exp(-(self.w1.dot(features)+self.b1)))
-            pred = 1/(1+np.exp(-(self.w2.dot(hiddenAct)+self.b2)))
-            if pred<worstScore:
-                worstScore = pred
-            if pred>bestScore:
+            val = self.evalFn(tmpGame,self.color,self.evalArgs)
+            if val > bestVal:
+                bestVal = val
                 move = m
-                bestFeats = features.copy()
-                bestAct = hiddenAct.copy()
-                bestScore = pred.copy()
-        print "Best,",bestScore
-        print "Worts,",worstScore
-        self.grads.append(self.backprop(bestFeats,bestAct,bestScore))
-        self.V.append(bestScore)
         return move
-        
-    def backprop(self,a1,a2,v):
-        del2 = v*(1-v)
-        del1 = self.w2.T*del2*a2*(1-a2)
-        return [del1*a1.T,del2*a2.T,del1,del2]
 
-    def compute_update(self,outcome):
-        # outcome is 1 if win, 0 otherwise
-        self.V.append(outcome)
-        updates = [np.zeros(self.w1.shape),np.zeros(self.w2.shape),
-                   np.zeros(self.b1.shape),np.zeros(self.b2.shape)]
-        gradsums = [np.zeros(self.w1.shape),np.zeros(self.w2.shape),
-                   np.zeros(self.b1.shape),np.zeros(self.b2.shape)]
+class ExpectiMaxPlayer(player.Player,object):
 
-        for t in xrange(len(self.V)-1):
-            currdiff = self.V[t+1]-self.V[t]
-            for update,gradsum,grad in zip(updates,gradsums,self.grads[t]):
-                gradsum += self.gamma*gradsum+grad
-                update += currdiff*gradsum
-        return updates
+    def __init__(self,color,num,evalFn,evalArgs=None):
+        super(self.__class__,self).__init__(color,num)
+        self.evalFn = evalFn
+        self.evalArgs = evalArgs
+
+    def take_turn(self,moves,game,depth=1):
+        if depth==0:
+            return self.evalFn(game,self.color,self.evalArgs)
+        move = None
+        bestScore = float("-inf")
+        for m in moves:
+            tmpGame = game.clone()
+            tmpGame.take_turn(m,self.color)
+            score = self.expecti(tmpGame,depth,game.opponent(self.color))
+            if score>bestScore:
+                move = m
+                bestScore = score
+        return move
+
+    def expecti(self,game,depth,color):
+        total = 0
+        for i in range(1,game.die+1):
+            for j in range(i,game.die+1):
+                moves = game.get_moves((i,j),color)
+                rollTotal = 0.
+                for m in moves:
+                    tmpGame = game.clone()
+                    tmpGame.take_turn(m,color)
+                    rollTotal += self.take_turn(None,tmpGame,depth-1)
+                if moves:
+                    total += rollTotal/float(len(moves))
+
+        return total/(game.die*(game.die+1)/2.)

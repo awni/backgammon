@@ -2,7 +2,8 @@
 #layout = "0-2-o,5-5-x,7-3-x,11-5-o,12-5-x,16-3-o,18-5-o,23-2-x"
 #layout = "0-2-o,4-2-x,6-2-x,9-2-o,10-2-x,13-2-o,15-2-o,19-2-x"
 layout = "0-1-o,3-2-x,5-2-o,8-2-o,7-2-x,10-2-x,12-2-o,15-1-x"
-#layout = "0-6-x,1-1-x,14-2-o,15-4-o"
+#layout = "0-1-x,3-2-x,5-2-x,10-2-o,12-2-o,15-1-o"
+
 colors = ['o','x']
 num_cols = 16
 quad = 4
@@ -14,20 +15,21 @@ import os
 class Game:
 
     def __init__(self,layout=None,grid=None,out_pieces=None,
-                 bar_pieces=None,numpieces=None):
+                 bar_pieces=None,numpieces=None,gcolors=None):
         """
         Define a new game object
         """
         self.die = quad
         self.layout = layout
-        self.colors = ['o','x']
         if grid:
             import copy
             self.grid = copy.deepcopy(grid)
             self.out_pieces = copy.deepcopy(out_pieces)
             self.bar_pieces = copy.deepcopy(bar_pieces)
             self.numpieces = copy.deepcopy(numpieces)
+            self.colors = gcolors
             return
+        self.colors = colors
         self.grid = [[] for _ in range(num_cols)]
         self.out_pieces = {}
         self.bar_pieces = {}
@@ -43,7 +45,7 @@ class Game:
             
     def clone(self):
         return Game(None,self.grid,self.out_pieces,
-                    self.bar_pieces,self.numpieces)
+                    self.bar_pieces,self.numpieces,self.colors)
     
     def opponent(self,color):
         for c in self.colors:
@@ -57,6 +59,17 @@ class Game:
         for col in self.grid:
             for piece in col:
                 self.numpieces[piece] += 1
+
+    def winner(self):
+        if len(self.out_pieces[self.colors[0]]) > len(self.out_pieces[self.colors[1]]):
+            return 0
+        elif len(self.out_pieces[self.colors[0]]) < len(self.out_pieces[self.colors[1]]):
+            return 1
+        else:
+            if len(self.bar_pieces[self.colors[1]]) <= len(self.bar_pieces[self.colors[0]]):
+                return 1
+            else:
+                return 0
 
     def get_moves(self,roll,color):
         """
