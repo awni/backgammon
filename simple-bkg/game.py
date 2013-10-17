@@ -1,11 +1,11 @@
 
-layout = "0-2-o,5-5-x,7-3-x,11-5-o,12-5-x,16-3-o,18-5-o,23-2-x"
+#layout = "0-2-o,5-5-x,7-3-x,11-5-o,12-5-x,16-3-o,18-5-o,23-2-x"
 #layout = "0-2-o,4-2-x,6-2-x,9-2-o,10-2-x,13-2-o,15-2-o,19-2-x"
-#layout = "23-0-w,18-2-w,20-2-w,0-2-b,4-1-b,5-1-b,6-1-b,7-1-b,21-1-b"
-#layout = "22-1-w,0-2-b,4-1-b,5-1-b,6-1-b,7-1-b,21-1-b"
+layout = "0-1-o,3-2-x,5-2-o,8-2-o,7-2-x,10-2-x,12-2-o,15-1-x"
+#layout = "0-6-x,1-1-x,14-2-o,15-4-o"
 
-num_cols = 24
-quad = 6
+num_cols = 16
+quad = 4
 OFF = 'off'
 ON = 'on'
 
@@ -63,39 +63,49 @@ class Game:
         if color == self.colors[1]:
             r1,r2 = -r1,-r2
 
-        if self.bar_pieces[color]:
-            self.onboard_piece(moves,color,r1,r2)
-            self.onboard_piece(moves,color,r2,r1)
-            return moves
-
+       #if self.bar_pieces[color]:
+         #self.onboard_piece(moves,color,r1,r2)
+         #self.onboard_piece(moves,color,r2,r1)
+         #return moves
+        
         offboarding = self.can_offboard(color)
-
         for i in range(num_cols):
             if self.is_valid_move(i,i+r1,color):
                 move1 = (i,i+r1)
                 piece = self.grid[i].pop()
+                bar_piece = None
+                if len(self.grid[i+r1])==1 and self.grid[i+r1][-1]!=color:
+                    bar_piece = self.grid[i+r1].pop()
                 self.grid[i+r1].append(piece)
-                self.get_second_move(color,r2,moves,move1,offboarding)
+                self.get_second_move(color,r2,moves,move1)
                 self.grid[i+r1].pop()
                 self.grid[i].append(piece)
+                if bar_piece:
+                    self.grid[i+r1].append(bar_piece)
 
             if offboarding and self.remove_piece(color,i,r1):
                 move1 = (i,OFF)
                 piece = self.grid[i].pop()
+                self.out_pieces[color].append(piece)
                 self.get_second_move(color,r2,moves,move1,offboarding)
-                if len(self.out_pieces[color])==self.numpieces[color]-1:
+                if len(self.out_pieces[color])+len(self.bar_pieces[color])==self.numpieces[color]:
                     moves.add((move1,))
+                self.out_pieces[color].pop()
                 self.grid[i].append(piece)
 
-        r = r1+r1
-        for i in range(num_cols):
-            if self.is_valid_move(i,i+r,color):
-                move = (i,i+r)
-                moves.add((move,))
-        
+        # has no moves, try moving only one piece
+        if not moves:
+            for i in range(num_cols):
+                for r in [r1,r2]:
+                    if self.is_valid_move(i,i+r,color):
+                        move1 = (i,i+r)
+                        moves.add((move1,))
+
         return moves
 
-    def get_second_move(self,color,r2,moves,move1,offboarding):
+    def get_second_move(self,color,r2,moves,move1,offboarding=None):
+        if not offboarding:
+            offboarding = self.can_offboard(color)
         for j in range(num_cols):
             if offboarding and self.remove_piece(color,j,r2):
                 move2 = (j,OFF)
@@ -139,13 +149,13 @@ class Game:
         for i in range(start,end):
             if len(self.grid[i])>0 and self.grid[i][0]==color:
                 count += len(self.grid[i])
-        if count+len(self.out_pieces[color]) == self.numpieces[color]:
+        if count+len(self.out_pieces[color])+len(self.bar_pieces[color]) == self.numpieces[color]:
             return True
         return False
 
 
     def remove_piece(self,color,start,r):
-        if color==self.colors[0] and start <= num_cols-quad:
+        if color==self.colors[0] and start < num_cols-quad:
             return False
         if color==self.colors[1] and start >= quad:
             return False
@@ -174,11 +184,9 @@ class Game:
         if len(self.grid[start]) > 0 and self.grid[start][0] == color:
             if end < 0 or end >= num_cols:
                 return False
-            if len(self.grid[end]) == 0:
+            if len(self.grid[end]) <= 1:
                 return True
-            if len(self.grid[end]) == 1:
-                return True
-            if len(self.grid[end])>1 and self.grid[end][0] == color:
+            if len(self.grid[end])>1 and self.grid[end][-1] == color:
                 return True
         return False
 
@@ -205,9 +213,9 @@ class Game:
         Checks if the game is over.
         """
         for c in self.colors:
-            if len(self.out_pieces[c])==self.numpieces[c]:
+            if len(self.out_pieces[c])+len(self.bar_pieces[c])==self.numpieces[c]:
                 return True
-
+         
         return False
 
     def draw(self):
