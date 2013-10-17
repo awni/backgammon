@@ -47,7 +47,7 @@ class Game:
     
     def opponent(self,color):
         for c in self.colors:
-            if c!= color: return color
+            if c!= color: return c
 
 
     def new_game(self):

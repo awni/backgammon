@@ -2,12 +2,11 @@
 import game, player, random, submission
 import numpy as np
 
-def train():
+def train(maxIter=10000):
     gamma = 0.7
-    alpha = .1
+    alpha = 1e-3
     numFeats = game.num_cols*2*3+4
     numHidden = 30
-    maxIter = 1000
     weights = [1e-2*np.random.randn(numHidden,numFeats),1e-2*np.random.randn(1,numHidden),
                np.zeros((numHidden,1)),np.zeros((1,1))]
 
@@ -50,7 +49,7 @@ def run_game(players,g,draw=False):
     import time
     g.new_game()
     
-    playernum = -1
+    playernum = random.randint(0,1)
     over = False
     while not over:
         playernum = (playernum+1)%2
@@ -69,20 +68,22 @@ def run_game(players,g,draw=False):
     elif len(g.out_pieces[g.colors[0]]) < len(g.out_pieces[g.colors[1]]):
         return 1
     else:
-        if len(g.bar_pieces[g.colors[0]]) > len(g.bar_pieces[g.colors[1]]):
+        if len(g.bar_pieces[g.colors[1]]) <= len(g.bar_pieces[g.colors[0]]):
             return 1
         else:
             return 0
-            
-    return players[playernum].num
 
 def turn(player,g):
     roll = roll_dice(g)
     moves = g.get_moves(roll,player.color)
+#    print "PLAYER is ",player.color
+#    print moves
+#    print "ROLL",roll
     if moves:
         move = player.take_turn(moves,g)
     else:
         move = None
+#    print "MOVE",move
     if move:
         g.take_turn(move,player.color)
 
@@ -127,7 +128,6 @@ def main(args=None):
         evalFn = submission.simpleEvaluate
         evalArgs = game.colors[0]
         
-    
     p1 = None
     p2 = None
     if opts.player1 == 'random':
@@ -146,7 +146,7 @@ def main(args=None):
         print "Please specify legitimate player"
         import sys
         sys.exit(1)
-    
+#    p2 = player.ExpectiMaxPlayer(game.colors[1],1,evalFn,evalArgs)
     test([p1,p2],numGames=int(opts.numgames),draw=opts.draw)
 
 if __name__=="__main__":

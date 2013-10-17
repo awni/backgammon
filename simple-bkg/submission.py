@@ -54,7 +54,8 @@ class TDPlayer(player.Player, object):
     def take_turn(self,moves,game):
         move = None
         bestScore = 0
-        for m in list(moves):
+        worstScore = 1
+        for m in moves:
             
             # take the move
             tmpGame = game.clone()
@@ -64,11 +65,15 @@ class TDPlayer(player.Player, object):
             features = np.array(extract_features(tmpGame)).reshape(-1,1)
             hiddenAct = 1/(1+np.exp(-(self.w1.dot(features)+self.b1)))
             pred = 1/(1+np.exp(-(self.w2.dot(hiddenAct)+self.b2)))
+            if pred<worstScore:
+                worstScore = pred
             if pred>bestScore:
                 move = m
                 bestFeats = features.copy()
                 bestAct = hiddenAct.copy()
                 bestScore = pred.copy()
+        print "Best,",bestScore
+        print "Worts,",worstScore
         self.grads.append(self.backprop(bestFeats,bestAct,bestScore))
         self.V.append(bestScore)
         return move

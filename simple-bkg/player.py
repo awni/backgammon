@@ -35,7 +35,7 @@ class ReflexPlayer(Player,object):
         """
         bestScore = float("-inf")
         move = None
-        for m in list(moves):
+        for m in moves:
             tmpGame = game.clone()
             tmpGame.take_turn(m,self.color)
             score = self.evalFn(game,self.evalArgs)
@@ -56,7 +56,7 @@ class ExpectiMaxPlayer(Player,object):
             return self.evalFn(game,self.evalArgs)
         move = None
         bestScore = float("-inf")
-        for m in list(moves):
+        for m in moves:
             tmpGame = game.clone()
             tmpGame.take_turn(m,self.color)
             score = self.expecti(tmpGame,depth,game.opponent(self.color))
@@ -67,13 +67,16 @@ class ExpectiMaxPlayer(Player,object):
         
     def expecti(self,game,depth,color):
         total = 0
-        for i in range(game.die):
+        for i in range(1,game.die+1):
             for j in range(i,game.die+1):
                 moves = game.get_moves((i,j),color)
+                rollTotal = 0.
                 for m in moves:
                     tmpGame = game.clone()
                     tmpGame.take_turn(m,color)
-                    total += self.take_turn(None,tmpGame,depth-1)
+                    rollTotal += self.take_turn(None,tmpGame,depth-1)
+                if moves:
+                    total += rollTotal/len(moves)
 
         return total/(game.die*(game.die+1)/2.)
             
