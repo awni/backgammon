@@ -1,118 +1,289 @@
-import player
-import numpy as np
+import agent
 
-def featsForColumn(column,color):
-    feats = [0.]*3
-    if len(column)>0 and column[0]==color:
-        for i in range(len(column)):
-            feats[min(i,2)] += 1
-    feats[-1] = feats[-1]/2.0
-    return feats
-            
-def extractFeatures(game,color):
+# BEGIN_HIDE
+import numpy as np
+# END_HIDE
+
+############################################################
+# Problem 1a
+
+def simpleEvaluation(state, evalArgs=None):
     """
-    @params game: state of backgammon board
-    
-    @returns features: list of real valued features
+    Evaluates the current game state with a simple heuristic.
+
+    @param state : Tuple of (game,player), the game is
+    a game object (see game.py for details, and player in
+    {'o','x'} designates whose turn it is.
+
+    @returns V : (scalar) evaluation of current game state
     """
+    # BEGIN_SOLUTION
+    game,player = state
+    numHome = 0
+    for c in range(12,16):
+        col = game.grid[c]
+        if len(col)>=1 and col[0]==player:
+            numHome += len(col)
+    V = 10*len(game.offPieces[player])
+    V += numHome
+    V -= .1*len(game.barPieces[player])
+    # END_SOLUTION
+    return V
+
+############################################################
+# Problem 1b
+
+# Reflex Agent evaluates only the current game state and returns
+# the best action.
+class ReflexAgent(agent.Agent, object):
+
+    def __init__(self, player, evalFunction, evalArgs=None):
+        super(self.__class__, self).__init__(player)
+        self.evaluationFunction = evalFunction
+        self.evaluationArgs = evalArgs
+
+    def getAction(self, actions, game):
+        """
+        Return best action according to self.evaluationFunction,
+        with no lookahead.
+
+        @param actions : A set() of possible legal actions for a given roll,
+        player and game state.
+        @param game : game object (see game.py for details).
+
+        Methods and attributes that may come in handy include:
+
+        self.player - the player this agent represents
+
+        game.clone() - returns a copy of the current game
+
+        game.takeAction(action, player) - takes the action for the
+        player with the given player.
+
+        @returns action : Best action according to
+        self.evaluationFunction from set of actions.  If there are
+        several best, pick the one with the lexicographically largest
+        action.
+        """
+        # - Call the evaluation function using the instance attribute
+        #
+        #     self.evaluationFunction(state, self.evaluationArgs)
+        #
+        # - state is a pair: (game, player)
+        # - self.evaluationArgs will be the weights when we are using
+        #   a linear evaluation function.  For the simple evaluation
+        #   this will be None.
+        # BEGIN_SOLUTION
+        def score(g, a):
+            g = g.clone()
+            g.takeAction(a, self.player)
+            return self.evaluationFunction((g, self.player), self.evaluationArgs)
+        outcomes = [(score(game, a), a) for a in actions]
+        action = max(outcomes)[1]
+        # END_SOLUTION
+        return action
+
+    def setWeights(self, w):
+        """
+        Updates weights of reflex agent.  Used for training.
+        """
+        self.evaluationArgs = w
+
+############################################################
+# Problem 1c
+
+class ExpectimaxAgent(agent.Agent, object):
+
+    def getAction(self, actions, game):
+        """
+        Return best action according to self.evaluationFunction,
+        with 2-ply lookahead.
+
+        @param actions : A set() of possible legal actions for a given roll,
+        player and game state.
+        @param game : game object (see game.py for details).
+
+        Methods and instance variables that may come in handy include:
+
+        game.getActions(roll, player) - returns the set of legal actions for
+        a given roll and player.
+
+        game.clone() - returns a copy of the current game
+
+        game.takeAction(action, player) - takes the action for the
+        player and CHANGES the game state. You probably want to use
+        game.clone() to copy the game first.
+
+        game.die - the number of sides on the die
+
+        game.opponent(player) - returns the opponent of the given player
+
+        @returns action : Best action according to
+        self.evaluationFunction from set of actions.  If there are
+        several best, pick the one with the lexicographically largest
+        action.
+
+        """
+        # - Call the evaluation function using the instance attribute
+        #
+        #     self.evaluationFunction(state, self.evaluationArgs)
+        #
+        # - state is a pair: (game, player)
+        # - self.evaluationArgs will be the weights when we are using
+        #   a linear evaluation function.  For the simple evaluation
+        #   this will be None.
+
+        def allDiceRolls(game):
+            # Helper function to return all possible dice rolls for a game object
+            return [(i, j) for i in range(1, game.die + 1) for j in range(1, game.die + 1)]
+
+        # BEGIN_SOLUTION
+        def computeV(game,player):
+            total = 0
+            for roll in allDiceRolls(game):
+                actions = game.getActions(roll,player)
+                rollTotal = 0.
+                for a in actions:
+                    tmpGame = game.clone()
+                    tmpGame.takeAction(a,player)
+                    rollTotal += self.evaluationFunction((tmpGame,self.player),self.evaluationArgs)
+                if actions:
+                    total += rollTotal/float(len(actions))
+            return total/float(game.die**2)
+
+        outcomes = []
+        for a in actions:
+            tmpGame = game.clone()
+            tmpGame.takeAction(a,self.player)
+            score = computeV(tmpGame,game.opponent(self.player))
+            outcomes.append((score, a))
+        action = max(outcomes)[1]
+        # END_SOLUTION
+        return action
+
+
+    def __init__(self, player, evalFn, evalArgs=None):
+        super(self.__class__, self).__init__(player)
+        self.evaluationFunction = evalFn
+        self.evaluationArgs = evalArgs
+
+############################################################
+# Problem 2a
+
+
+def extractFeatures(state):
+    """
+    @param state : Tuple of (game, player), the game is
+    a game object (see game.py for details, and player in
+    {'o', 'x'} designates whose turn it is.
+
+    @returns features : List of real valued features for given state.
+
+    Methods and instance variables that may come in handy include:
+
+    game.getActions(roll, player) - returns the set of legal actions for
+    a given roll and player.
+
+    game.clone() - returns a copy of the current game
+
+    game.grid - 2-D array (list of lists) with current piece placement on
+    board. For example game.grid[0][3] = 'x'
+
+    game.barPieces - dictionary with key as player and value a list of
+    pieces on the bar for that player. Recall on the bar means the piece was
+    "clobbered" by the opponent. In our simplified backgammon these pieces
+    can't return to play.
+
+    game.offPieces - dictionary with key as player and value a list
+    of pieces successfully taken of the board by the player.
+
+    game.numPieces - dictionary with key as player and value number
+    of total pieces for that player.
+
+    game.players - list of players 1 and 2 in order
+    """
+    # BEGIN_SOLUTION
+    def extractColumnFeatures(column,player):
+        feats = [0.]*3
+        if len(column)>0 and column[0]==player:
+            for i in range(len(column)):
+                feats[min(i,2)] += 1
+        return feats
+
+    game,player = state
     features = []
-    for c in game.colors:
+    for p in game.players:
         for col in game.grid:
-            feats = featsForColumn(col,c)
+            feats = extractColumnFeatures(col,p)
             features += feats
-        features.append(float(len(game.bar_pieces[c]))/2)
-        features.append(float(len(game.out_pieces[c]))/game.numpieces[c])
-    if color == game.colors[0]:
-        features += [1.,0.] # player 0
+        features.append(float(len(game.barPieces[p])))
+        features.append(float(len(game.offPieces[p]))/game.numPieces[p])
+    if player == game.players[0]:
+        features += [1.,0.]
     else:
         features += [0.,1.]
+    features += [1.0] # bias
+    # END_SOLUTION
     return features
 
-def nnEvaluate(game,color,weights,backprop=False):
-    w1,w2,b1,b2 = weights
-    features = np.array(extractFeatures(game,color)).reshape(-1,1)
-    hidden = 1/(1+np.exp(-(w1.dot(features)+b1)))
-    v = 1/(1+np.exp(-(w2.dot(hidden)+b2)))
-    if backprop:
-        del2 = v*(1-v)
-        del1 = w2.T*del2*hidden*(1-hidden)
-        return v,[del1*features.T,del2*hidden.T,del1,del2]
-    return v
 
-def computeUpdate(v,vnext,gamma,grads,traces):
-    valdiff = vnext-v
-    updates = []
-    newTraces = []
-    for trace,grad in zip(traces,grads):
-        trace = gamma*trace+grad
-        update = valdiff*trace
-        updates.append(update)
-        newTraces.append(trace)
-    return updates,newTraces
+############################################################
+# Problem 2b
 
-def simpleEvaluate(game,color,evalArgs=None):
-    numSingletons = 0
-    for col in game.grid:
-        if len(col)==1 and col[0]==color:
-            numSingletons += 1
+def logLinearEvaluation(state, w):
+    """
+    Evaluate the current state using the log-linear evaluation
+    function.
 
-    score = 5.*len(game.out_pieces[color])
-    #score += -0.5*len(game.bar_pieces[color]) 
-    #score += 0.5*numSingletons
-    return score
+    @param state : Tuple of (game, player), the game is
+    a game object (see game.py for details, and player in
+    {'o', 'x'} designates whose turn it is.
 
+    @param w : List of feature weights.
 
-class ReflexPlayer(player.Player,object):
+    @returns V : Evaluation of current game state.
+    """
+    # BEGIN_SOLUTION
+    w = np.array(w).reshape(-1,1)
+    features = np.array(extractFeatures(state)).reshape(-1,1)
+    V = 1/(1+np.exp(-w.T.dot(features)))
+    V = V.squeeze().tolist()
+    # END_SOLUTION
+    return V
 
-    def __init__(self,color,num,evalFn,evalArgs=None):
-        super(self.__class__,self).__init__(color,num)
-        self.evalFn = evalFn
-        self.evalArgs = evalArgs
+############################################################
+# Problem 2c
 
-    def take_turn(self,moves,game):
-        move = None
-        bestVal = float("-inf")
-        for m in moves:
-            tmpGame = game.clone()
-            tmpGame.take_turn(m,self.color)
-            val = self.evalFn(tmpGame,self.color,self.evalArgs)
-            if val > bestVal:
-                bestVal = val
-                move = m
-        return move
+def TDUpdate(state, nextState, reward, w, eta):
+    """
+    Given two sequential game states, updates the weights
+    with a step size of eta, using the Temporal Difference learning
+    algorithm.
 
-class ExpectiMaxPlayer(player.Player,object):
+    @param state : Tuple of game state (game object, player).
+    @param nextState : Tuple of game state (game object, player),
+    note if the game is over this will be None. In this case, 
+    the next value for the TD update will be 0.
+    @param reward : The reward is 1 if the game is over and your
+    player won, 0 otherwise.
+    @param w : List of feature weights.
+    @param eta : Step size for learning.
 
-    def __init__(self,color,num,evalFn,evalArgs=None):
-        super(self.__class__,self).__init__(color,num)
-        self.evalFn = evalFn
-        self.evalArgs = evalArgs
+    @returns w : Updated weights.
+    """
+    # BEGIN_SOLUTION
+    w = np.array(w).reshape(-1,1)
+    features = np.array(extractFeatures(state)).reshape(-1,1)
+    v = 1/(1+np.exp(-w.T.dot(features)))
+    grad = v*(1-v)*features
 
-    def take_turn(self,moves,game,depth=1):
-        if depth==0:
-            return self.evalFn(game,self.color,self.evalArgs)
-        move = None
-        bestScore = float("-inf")
-        for m in moves:
-            tmpGame = game.clone()
-            tmpGame.take_turn(m,self.color)
-            score = self.expecti(tmpGame,depth,game.opponent(self.color))
-            if score>bestScore:
-                move = m
-                bestScore = score
-        return move
+    if nextState is None:
+        nextV = 0
+    else:
+        features = np.array(extractFeatures(nextState)).reshape(-1,1)
+        nextV = 1/(1+np.exp(-w.T.dot(features)))
 
-    def expecti(self,game,depth,color):
-        total = 0
-        for i in range(1,game.die+1):
-            for j in range(i,game.die+1):
-                moves = game.get_moves((i,j),color)
-                rollTotal = 0.
-                for m in moves:
-                    tmpGame = game.clone()
-                    tmpGame.take_turn(m,color)
-                    rollTotal += self.take_turn(None,tmpGame,depth-1)
-                if moves:
-                    total += rollTotal/float(len(moves))
-
-        return total/(game.die*(game.die+1)/2.)
+    w += eta*(reward+nextV-v)*grad
+    w = w.squeeze().tolist()
+    # END_SOLUTION
+    return w

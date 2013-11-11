@@ -1,26 +1,23 @@
+import time
+import game
+import agent, random, submission
 
-import game, player, random, submission
-import numpy as np
-
-def train(maxIter=10000):
-    gamma = 0.7
+def train(numGames=2000):
     alpha = 1e-1
-    numFeats = game.num_cols*2*3+6
-    numHidden = 30
-    weights = [1e-2*np.random.randn(numHidden,numFeats),1e-2*np.random.randn(1,numHidden),
-               np.zeros((numHidden,1)),np.zeros((1,1))]
-    traces = [np.zeros(w.shape) for w in weights]
+    numFeats = game.NUMCOLS*2*3+7
+    evalFn = submission.logLinearEvaluation
+    w = [random.gauss(0,1e-2) for _ in range(numFeats)]
+    w[-1] = 0
 
-    for it in xrange(maxIter):
+    for it in xrange(numGames):
 
-        g = game.Game(game.layout)
-        players = [submission.ReflexPlayer(g.colors[0],0,submission.nnEvaluate,weights), 
-                   submission.ReflexPlayer(g.colors[1],1,submission.nnEvaluate,weights)]
-
+        g = game.Game(game.LAYOUT)
+        players = [submission.ReflexAgent(g.players[0],evalFn,w), 
+                   submission.ReflexAgent(g.players[1],evalFn,w)]
 
         g.new_game()
         playernum = random.randint(0,1)
-        v,grads = submission.nnEvaluate(g,g.colors[playernum],weights,True)
+        state = (g.clone(),g.players[playernum])
         over = False
         while not over:
             if playernum:
@@ -29,79 +26,82 @@ def train(maxIter=10000):
             if playernum:
                 g.reverse()
             playernum = (playernum+1)%2
-            vnext,gradsNext = submission.nnEvaluate(g,g.colors[playernum],weights,True)
-            updates,traces = submission.computeUpdate(v,vnext,gamma,grads,traces)
-            v = vnext
-            grads = gradsNext
-
-            for w,update in zip(weights,updates):
-                w += alpha*update
+            nextState = (g.clone(),g.players[playernum])
+            w = submission.TDUpdate(state,nextState,0,w,alpha)
+            state = nextState
+            for p in players: p.setWeights(w)
             over = g.is_over()
 
         winner = g.winner()
 
-        if it%10 == 0:
-            print "iteration : %d"%it
+        if it%100 == 0:
+            print "Game : %d/%d"%(it,numGames)
 
         # flip outcome for training
-        if winner==0:
-            outcome = 1.0
-        else:
-            outcome = 0.0
-
-        updates,traces = submission.computeUpdate(v,outcome,gamma,grads,traces)
-        for w,update in zip(weights,updates):
-            w += alpha*update
+        winner = 1.0-winner
+        w = submission.TDUpdate(state,None,winner,w,alpha)
 
     # save weights
-    fid = open("weights.npy",'w')
+    fid = open("weights.bin",'w')
     import pickle
-    pickle.dump(weights,fid)
+    pickle.dump(w,fid)
     fid.close()
-    return weights
+    return w
 
 def test(players,numGames=100,draw=False):
     winners = [0,0]
     for _ in xrange(numGames):
-        g = game.Game(game.layout)
+        g = game.Game(game.LAYOUT)
         winner = run_game(players,g,draw)
-        print "The winner is : Player %d"%winner
+        print "The winner is : Player %s"%players[winner].player
         winners[winner]+=1
-    print winners
+    print "Summary:"
+    print "Player %s : %d/%d"%(players[0].player,winners[0],sum(winners))
+    print "Player %s : %d/%d"%(players[1].player,winners[1],sum(winners))
 
 def run_game(players,g,draw=False):
-    import time
     g.new_game()
-    
     playernum = random.randint(0,1)
-
     over = False
     while not over:
+        if draw:
+            g.draw()
+            time.sleep(1.5)
         playernum = (playernum+1)%2
         if playernum:
             g.reverse()
-        turn(players[playernum],g)
+        turn(players[playernum],g,draw)
         if playernum:
             g.reverse()
         over = g.is_over()
         if draw:
-            time.sleep(1)
-            g.draw()
+            time.sleep(1.5)
 
     return g.winner()
 
-def turn(player,g):
+def turn(player,g,draw=False):
     roll = roll_dice(g)
-    moves = g.get_moves(roll,player.color)
+    if draw:
+        print "Player %s rolled <%d,%d>."%(player.player,roll[0],roll[1])
+    moves = g.getActions(roll,g.players[0])
     if moves:
-        move = player.take_turn(moves,g)
+        move = player.getAction(moves,g)
     else:
         move = None
     if move:
-        g.take_turn(move,player.color)
+        g.takeAction(move,g.players[0])
 
 def roll_dice(g):
     return (random.randint(1,g.die), random.randint(1,g.die))
+
+def load_weights(weights):
+    if weights is None:
+        try:
+            import pickle
+            weights = pickle.load(open('weights.bin','r'))
+        except IOError:
+            print "You need to train the weights to use the better evaluation function"
+    return weights
 
 def main(args=None):
     from optparse import OptionParser
@@ -114,10 +114,8 @@ def main(args=None):
     parser.add_option("-n","--num",dest="numgames",default=1,help="Num games to play")
     parser.add_option("-p","--player1",dest="player1",
                       default="random",help="Choose type of first player")
-    parser.add_option("-q","--player2",dest="player2",
-                      default="random",help="Choose type of second player")
-    parser.add_option("-e","--eval",dest="eval",default="simple",
-                        help="Choose eval function for player if relevant")
+    parser.add_option("-e","--eval",dest="eval",action="store_true",default=False,
+                        help="Play with the better eval function for player")
 
     (opts,args) = parser.parse_args(args)    
 
@@ -125,43 +123,32 @@ def main(args=None):
     if opts.train:
         weights = train()
         
-    if opts.eval == "nn":
-        if not weights:
-            try:
-                import pickle
-                weights = pickle.load(open('weights.npy','r'))
-            except IOError:
-                print "You need to train weights to use the Neural Net eval function"
-
-        evalFn = submission.nnEvaluate
+    if opts.eval:
+        weights = load_weights(weights)
+        evalFn = submission.logLinearEvaluation
         evalArgs = weights
     else:
-        evalFn = submission.simpleEvaluate
+        evalFn = submission.simpleEvaluation
         evalArgs = None
         
     p1 = None
-    p2 = None
     if opts.player1 == 'random':
-        p1 = player.RandomPlayer(game.colors[0],0)
+        p1 = agent.RandomAgent(game.Game.TOKENS[0])
     elif opts.player1 == 'reflex':
-        p1 = submission.ReflexPlayer(game.colors[0],0,evalFn,evalArgs)
+        p1 = submission.ReflexAgent(game.Game.TOKENS[0],evalFn,evalArgs)
     elif opts.player1 == 'expectimax':
-        p1 = submission.ExpectiMaxPlayer(game.colors[0],0,evalFn,evalArgs)
+        p1 = submission.ExpectimaxAgent(game.Game.TOKENS[0],evalFn,evalArgs)
     elif opts.player1 == 'human':
-        p1 = player.HumanPlayer(game.colors[0],0)
+        p1 = agent.HumanAgent(game.Game.TOKENS[0])
 
-    if opts.player2 == 'random':
-        p2 = player.RandomPlayer(game.colors[1],1)
+    p2 = agent.RandomAgent(game.Game.TOKENS[1])
 
-    if p1 is None or p2 is None:
+    if p1 is None:
         print "Please specify legitimate player"
         import sys
         sys.exit(1)
 
-    #p2 = submission.ReflexPlayer(game.colors[1],1,evalFn,evalArgs)
-    #p2 = player.ExpectiMaxPlayer(game.colors[1],1,evalFn,evalArgs)
     test([p1,p2],numGames=int(opts.numgames),draw=opts.draw)
 
 if __name__=="__main__":
-    ## TODO opts parer
     main()

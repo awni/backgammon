@@ -1,259 +1,296 @@
+import os
+LAYOUT = "0-2-o,5-5-x,7-3-x,11-5-o,12-5-x,16-3-o,18-5-o,23-2-x"
 
-layout = "0-2-o,5-5-x,7-3-x,11-5-o,12-5-x,16-3-o,18-5-o,23-2-x"
-#layout = "0-2-o,4-2-x,6-2-x,9-2-o,10-2-x,13-2-o,15-2-o,19-2-x"
-#layout = "23-0-w,18-2-w,20-2-w,0-2-b,4-1-b,5-1-b,6-1-b,7-1-b,21-1-b"
-#layout = "22-1-w,0-2-b,4-1-b,5-1-b,6-1-b,7-1-b,21-1-b"
-
-num_cols = 24
-quad = 6
+NUMCOLS = 24
+QUAD = 6
 OFF = 'off'
 ON = 'on'
 
-import os
-
 class Game:
 
-    def __init__(self,layout=None,grid=None,out_pieces=None,
-                 bar_pieces=None,numpieces=None):
+    def __init__(self,layout=None,grid=None,offPieces=None,
+                 barPieces=None,numPieces=None,gPlayers=None):
         """
         Define a new game object
         """
+        self.die = QUAD
         self.layout = layout
-        self.colors = ['o','x']
         if grid:
             import copy
             self.grid = copy.deepcopy(grid)
-            self.out_pieces = copy.deepcopy(out_pieces)
-            self.bar_pieces = copy.deepcopy(bar_pieces)
-            self.numpieces = copy.deepcopy(numpieces)
+            self.offPieces = copy.deepcopy(offPieces)
+            self.barPieces = copy.deepcopy(barPieces)
+            self.numPieces = copy.deepcopy(numPieces)
+            self.players = gPlayers
             return
-        self.grid = [[] for _ in range(num_cols)]
-        self.out_pieces = {}
-        self.bar_pieces = {}
-        self.numpieces = {}
-        for c in self.colors:
-            self.bar_pieces[c] = []
-            self.out_pieces[c] = []
-            self.numpieces[c] = 0
+        self.players = Game.TOKENS
+        self.grid = [[] for _ in range(NUMCOLS)]
+        self.offPieces = {}
+        self.barPieces = {}
+        self.numPieces = {}
+        for t in self.players:
+            self.barPieces[t] = []
+            self.offPieces[t] = []
+            self.numPieces[t] = 0
 
-    def reverse(self):
-        self.grid.reverse()
-        self.colors.reverse()
+    TOKENS = ['o','x']
             
     def clone(self):
-        return Game(None,self.grid,self.out_pieces,
-                    self.bar_pieces,self.numpieces)
+        """
+        Return an exact copy of the game. Changes can be made
+        to the cloned version without affecting the original.
+        """
+        return Game(None,self.grid,self.offPieces,
+                    self.barPieces,self.numPieces,self.players)
+    
+    def takeAction(self,action,token):
+        """
+        Makes given move for player, assumes move is valid, 
+        will remove pieces from play
+        """
+        for s,e in action:
+            if s==ON:
+                piece = self.barPieces[token].pop()
+            else:
+                piece = self.grid[s].pop()
+            if e==OFF:
+                self.offPieces[token].append(piece)
+                continue
+            if len(self.grid[e])>0 and self.grid[e][0] != token:
+                bar_piece = self.grid[e].pop()
+                self.barPieces[bar_piece].append(bar_piece)
+            self.grid[e].append(piece)
 
-    def new_game(self):
-        for col in self.layout.split(','):
-            loc,num,color = col.split('-')
-            self.grid[int(loc)] = [color for _ in range(int(num))]
-        for col in self.grid:
-            for piece in col:
-                self.numpieces[piece] += 1
-        
-
-    def get_moves(self,roll,color):
+    def getActions(self,roll,token):
         """
         Get set of all possible move tuples
         """
         moves = set()
 
         r1,r2 = roll
-        if color == self.colors[1]:
-            r1,r2 = -r1,-r2
 
-        if self.bar_pieces[color]:
-            self.onboard_piece(moves,color,r1,r2)
-            self.onboard_piece(moves,color,r2,r1)
+        if self.barPieces[token]:
+            self.onboard_piece(moves,token,r1,r2)
+            self.onboard_piece(moves,token,r2,r1)
             return moves
 
-        offboarding = self.can_offboard(color)
+        rolls = [(r1,r2),(r2,r1)]
+        offboarding = self.can_offboard(token)
+        for r1,r2 in rolls:
+            for i in range(len(self.grid)):
+                if self.is_valid_move(i,i+r1,token):
+                    move1 = (i,i+r1)
+                    piece = self.grid[i].pop()
+                    bar_piece = None
+                    if len(self.grid[i+r1])==1 and self.grid[i+r1][-1]!=token:
+                        bar_piece = self.grid[i+r1].pop()
+                    self.grid[i+r1].append(piece)
+                    self.get_second_move(token,r2,moves,move1)
+                    self.grid[i+r1].pop()
+                    self.grid[i].append(piece)
+                    if bar_piece:
+                        self.grid[i+r1].append(bar_piece)
 
-        for i in range(num_cols):
-            if self.is_valid_move(i,i+r1,color):
-                move1 = (i,i+r1)
-                piece = self.grid[i].pop()
-                self.grid[i+r1].append(piece)
-                self.get_second_move(color,r2,moves,move1,offboarding)
-                self.grid[i+r1].pop()
-                self.grid[i].append(piece)
+                if offboarding and self.remove_piece(token,i,r1):
+                    move1 = (i,OFF)
+                    piece = self.grid[i].pop()
+                    self.offPieces[token].append(piece)
+                    self.get_second_move(token,r2,moves,move1,offboarding)
+                    if len(self.offPieces[token])+len(self.barPieces[token])==self.numPieces[token]:
+                        moves.add((move1,))
+                    self.offPieces[token].pop()
+                    self.grid[i].append(piece)
 
-            if offboarding and self.remove_piece(color,i,r1):
-                move1 = (i,OFF)
-                piece = self.grid[i].pop()
-                self.get_second_move(color,r2,moves,move1,offboarding)
-                if len(self.out_pieces[color])==self.numpieces[color]-1:
-                    moves.add((move1,))
-                self.grid[i].append(piece)
+        # has no moves, try moving only one piece
+        if not moves:
+            for i in range(len(self.grid)):
+                for r in rolls[0]:
+                    if self.is_valid_move(i,i+r,token):
+                        move1 = (i,i+r)
+                        moves.add((move1,))
 
-        r = r1+r1
-        for i in range(num_cols):
-            if self.is_valid_move(i,i+r,color):
-                move = (i,i+r)
-                moves.add((move,))
-        
         return moves
 
-    def get_second_move(self,color,r2,moves,move1,offboarding):
-        for j in range(num_cols):
-            if offboarding and self.remove_piece(color,j,r2):
-                move2 = (j,OFF)
-                moves.add((move1,move2))
-                
-            if self.is_valid_move(j,j+r2,color):
-                move2 = (j,j+r2)
-                moves.add((move1,move2))
-
-    def onboard_piece(self,moves,color,r1,r2):
-        start = -1
-        if color==self.colors[1]:
-            start = num_cols
-        piece = self.bar_pieces[color].pop()
-        if len(self.grid[start+r1])<=1 or self.grid[start+r1][0]==color:
-            move1 = (ON,start+r1)
-            self.grid[start+r1].append(piece)
-            if self.bar_pieces[color]:
-                if len(self.grid[start+r2])<=1 or self.grid[start+r2][0]==color:
-                    move2 = (ON,start+r2)
-                    moves.add((move1,move2))
-                else:
-                    moves.add((move1,))
-            else:
-                for j in range(num_cols):
-                    if self.is_valid_move(j,j+r2,color):
-                        move2 = (j,j+r2)
-                        moves.add((move1,move2))
-            self.grid[start+r1].pop()
-        self.bar_pieces[color].append(piece)
-
-    def can_offboard(self,color):
-        if color==self.colors[1]:
-            start=0
-            end=quad
-        else:
-            start=num_cols-quad
-            end=num_cols
-
-        count = 0
-        for i in range(start,end):
-            if len(self.grid[i])>0 and self.grid[i][0]==color:
-                count += len(self.grid[i])
-        if count+len(self.out_pieces[color]) == self.numpieces[color]:
-            return True
-        return False
-
-
-    def remove_piece(self,color,start,r):
-        if color==self.colors[0] and start <= num_cols-quad:
-            return False
-        if color==self.colors[1] and start >= quad:
-            return False
-        if len(self.grid[start]) == 0 or self.grid[start][0] != color:
-            return False
-
-        if color==self.colors[1]:
-            if start+r==-1:
-                return True
-            if start+r<-1:
-                for i in range(start+1,quad):
-                    if len(self.grid[i]) != 0 and self.grid[i][0]==self.colors[1]:
-                        return False
-                return True
-        if color==self.colors[0]:
-            if start+r == num_cols:
-                return True
-            if start+r > num_cols:
-                for i in range(start-1,num_cols-quad-1,-1):
-                    if len(self.grid[i]) != 0 and self.grid[i][0]==self.colors[0]:
-                        return False
-                return True
-        return False
-
-    def is_valid_move(self,start,end,color):
-        if len(self.grid[start]) > 0 and self.grid[start][0] == color:
-            if end < 0 or end >= num_cols:
-                return False
-            if len(self.grid[end]) == 0:
-                return True
-            if len(self.grid[end]) == 1:
-                return True
-            if len(self.grid[end])>1 and self.grid[end][0] == color:
-                return True
-        return False
-
-    def take_turn(self,move,color):
+    def opponent(self,token):
         """
-        Makes given move for color, assumes move is valid, 
-        will remove pieces from play
+        Retrieve opponent players token for a given players token.
         """
-        for s,e in move:
-            if s==ON:
-                piece = self.bar_pieces[color].pop()
-            else:
-                piece = self.grid[s].pop()
-            if e==OFF:
-                self.out_pieces[color].append(piece)
-                continue
-            if len(self.grid[e])>0 and self.grid[e][0] != color:
-                bar_piece = self.grid[e].pop()
-                self.bar_pieces[bar_piece].append(bar_piece)
-            self.grid[e].append(piece)
+        for t in self.players:
+            if t!= token: return t
+
+    def isWon(self,player):
+        """
+        If game is over and player won, return True, else return False
+        """
+        return self.is_over() and player==self.players[self.winner()]
+
+    def isLost(self,player):
+        """
+        If game is over and player lost, return True, else return False
+        """
+        return self.is_over() and player!=self.players[self.winner()]
+
+
+    def reverse(self):
+        """
+        Reverses a game allowing it to be seen by the opponent
+        from the same perspective
+        """
+        self.grid.reverse()
+        self.players.reverse()
+
+    def new_game(self):
+        """
+        Resets game to original layout.
+        """
+        for col in self.layout.split(','):
+            loc,num,token = col.split('-')
+            self.grid[int(loc)] = [token for _ in range(int(num))]
+        for col in self.grid:
+            for piece in col:
+                self.numPieces[piece] += 1
+
+    def winner(self):
+        """
+        Get winner.
+        """
+        return self.offPieces[self.players[0]]==self.numPieces[self.players[0]]
 
     def is_over(self):
         """
         Checks if the game is over.
         """
-        for c in self.colors:
-            if len(self.out_pieces[c])==self.numpieces[c]:
+        for t in self.players:
+            if len(self.offPieces[t])==self.numPieces[t]:
                 return True
-
+         
         return False
+
+    def get_second_move(self,token,r2,moves,move1,offboarding=None):
+        if not offboarding:
+            offboarding = self.can_offboard(token)
+        for j in range(len(self.grid)):
+            if offboarding and self.remove_piece(token,j,r2):
+                move2 = (j,OFF)
+                moves.add((move1,move2))
+                
+            if self.is_valid_move(j,j+r2,token):
+                move2 = (j,j+r2)
+                moves.add((move1,move2))
+
+    def can_offboard(self,token):
+        if token==self.players[1]:
+            start=0
+            end=self.die
+        else:
+            start=len(self.grid)-self.die
+            end=len(self.grid)
+
+        count = 0
+        for i in range(start,end):
+            if len(self.grid[i])>0 and self.grid[i][0]==token:
+                count += len(self.grid[i])
+        if count+len(self.offPieces[token]) == self.numPieces[token]:
+            return True
+        return False
+
+    def remove_piece(self,token,start,r):
+        if token==self.players[0] and start < len(self.grid)-self.die:
+            return False
+        if token==self.players[1] and start >= self.die:
+            return False
+        if len(self.grid[start]) == 0 or self.grid[start][0] != token:
+            return False
+
+        if token==self.players[1]:
+            if start+r==-1:
+                return True
+            if start+r<-1:
+                for i in range(start+1,self.die):
+                    if len(self.grid[i]) != 0 and self.grid[i][0]==self.players[1]:
+                        return False
+                return True
+        if token==self.players[0]:
+            if start+r == len(self.grid):
+                return True
+            if start+r > len(self.grid):
+                for i in range(start-1,len(self.grid)-self.die-1,-1):
+                    if len(self.grid[i]) != 0 and self.grid[i][0]==self.players[0]:
+                        return False
+                return True
+        return False
+
+    def onboard_piece(self,moves,player,r1,r2):
+        start = -1
+        if player==self.players[1]:
+            start = NUMCOLS
+        piece = self.barPieces[player].pop()
+        if len(self.grid[start+r1])<=1 or self.grid[start+r1][0]==player:
+            move1 = (ON,start+r1)
+            self.grid[start+r1].append(piece)
+            if self.barPieces[player]:
+                if len(self.grid[start+r2])<=1 or self.grid[start+r2][0]==player:
+                    move2 = (ON,start+r2)
+                    moves.add((move1,move2))
+                else:
+                    moves.add((move1,))
+            else:
+                for j in range(NUMCOLS):
+                    if self.is_valid_move(j,j+r2,player):
+                        move2 = (j,j+r2)
+                        moves.add((move1,move2))
+            self.grid[start+r1].pop()
+        self.barPieces[player].append(piece)
+
+
+    def is_valid_move(self,start,end,token):
+        if len(self.grid[start]) > 0 and self.grid[start][0] == token:
+            if end < 0 or end >= len(self.grid):
+                return False
+            if len(self.grid[end]) <= 1:
+                return True
+            if len(self.grid[end])>1 and self.grid[end][-1] == token:
+                return True
+        return False
+
+
+    def draw_col(self,i,col):
+        print "|",
+        if i==-2:
+            if col<10:
+                print "",
+            print str(col),
+        elif i==-1:
+            print "--",
+        elif len(self.grid[col])>i:
+            print " "+self.grid[col][i],
+        else:
+            print "  ",
 
     def draw(self):
         os.system('clear')
-        largest = max([len(self.grid[i]) for i in range(num_cols/2,num_cols)])
+        largest = max([len(self.grid[i]) for i in range(len(self.grid)/2,len(self.grid))])
         for i in range(-2,largest):
-            for col in range(num_cols/2,num_cols):
-                print "|",
-                if i==-2:
-                    print str(col),
-                elif i==-1:
-                    print "--",
-                elif len(self.grid[col])>i:
-                    print " "+self.grid[col][i],
-                else:
-                    print "  ",
+            for col in range(len(self.grid)/2,len(self.grid)):
+                self.draw_col(i,col)
             print "|"
         print
         print
-        largest = max([len(self.grid[i]) for i in range(num_cols/2)])
+        largest = max([len(self.grid[i]) for i in range(len(self.grid)/2)])
         for i in range(largest-1,-3,-1):
-            for col in range(num_cols/2-1,-1,-1):
-                print "|",
-                if i==-2:
-                    if col<10:
-                        print "",
-                    print str(col),
-                elif i==-1:
-                    print "--",
-                elif len(self.grid[col])>i:
-                    print " "+self.grid[col][i],
-                else:
-                    print "  ",
+            for col in range(len(self.grid)/2-1,-1,-1):
+                self.draw_col(i,col)
             print "|"
-        pnum = 0
-        for c in self.colors:
-            print "<Player %d - %s>  Off Board : "%(pnum,c),
-            for piece in self.out_pieces[c]:
-                print c+'',
+        for t in self.players:
+            print "<Player %s>  Off Board : "%(t),
+            for piece in self.offPieces[t]:
+                print t+'',
             print "   Bar : ",
-            for piece in self.bar_pieces[c]:
-                print c+'',
+            for piece in self.barPieces[t]:
+                print t+'',
             print
-            pnum+=1
 
 if __name__=='__main__':
-    g = Game(layout)
+    g = Game(LAYOUT)
     g.new_game()
     g.draw()
