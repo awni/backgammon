@@ -55,22 +55,22 @@ def run_game(players,g,draw=False):
     playernum = random.randint(0,1)
     over = False
     while not over:
+        roll = roll_dice(g)
         if draw:
-            g.draw()
+            g.draw(roll)
         playernum = (playernum+1)%2
         if playernum:
             g.reverse()
-        turn(players[playernum],g,draw)
+        turn(players[playernum],g,roll,draw)
         if playernum:
             g.reverse()
         over = g.is_over()
         if draw:
-            time.sleep(6)
+            time.sleep(1)
 
     return g.winner()
 
-def turn(player,g,draw=False):
-    roll = roll_dice(g)
+def turn(player,g,roll,draw=False):
     if draw:
         print "Player %s rolled <%d,%d>."%(player.player,roll[0],roll[1])
     moves = g.getActions(roll,g.players[0])

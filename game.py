@@ -1,4 +1,6 @@
-import os
+import os, sys
+import pygame
+
 LAYOUT = "0-2-o,5-5-x,7-3-x,11-5-o,12-5-x,16-3-o,18-5-o,23-2-x"
 
 NUMCOLS = 24
@@ -32,6 +34,7 @@ class Game:
             self.barPieces[t] = []
             self.offPieces[t] = []
             self.numPieces[t] = 0
+        self.initGui()
 
     TOKENS = ['o','x']
             
@@ -61,55 +64,69 @@ class Game:
                 self.barPieces[bar_piece].append(bar_piece)
             self.grid[e].append(piece)
 
-    def getActions(self,roll,token):
+    def getActions(self,roll,player):
         """
         Get set of all possible move tuples
         """
         moves = set()
 
         r1,r2 = roll
-
-        if self.barPieces[token]:
-            self.onboard_piece(moves,token,r1,r2)
-            self.onboard_piece(moves,token,r2,r1)
-            return moves
-
-        rolls = [(r1,r2),(r2,r1)]
-        offboarding = self.can_offboard(token)
-        for r1,r2 in rolls:
-            for i in range(len(self.grid)):
-                if self.is_valid_move(i,i+r1,token):
-                    move1 = (i,i+r1)
-                    piece = self.grid[i].pop()
-                    bar_piece = None
-                    if len(self.grid[i+r1])==1 and self.grid[i+r1][-1]!=token:
-                        bar_piece = self.grid[i+r1].pop()
-                    self.grid[i+r1].append(piece)
-                    self.get_second_move(token,r2,moves,move1)
-                    self.grid[i+r1].pop()
-                    self.grid[i].append(piece)
-                    if bar_piece:
-                        self.grid[i+r1].append(bar_piece)
-
-                if offboarding and self.remove_piece(token,i,r1):
-                    move1 = (i,OFF)
-                    piece = self.grid[i].pop()
-                    self.offPieces[token].append(piece)
-                    self.get_second_move(token,r2,moves,move1,offboarding)
-                    if len(self.offPieces[token])+len(self.barPieces[token])==self.numPieces[token]:
-                        moves.add((move1,))
-                    self.offPieces[token].pop()
-                    self.grid[i].append(piece)
-
-        # has no moves, try moving only one piece
-        if not moves:
-            for i in range(len(self.grid)):
-                for r in rolls[0]:
-                    if self.is_valid_move(i,i+r,token):
-                        move1 = (i,i+r)
-                        moves.add((move1,))
+        if r1 == r2: # doubles
+            i = 4
+            # keep trying until we find some moves
+            while not moves and i>0:
+                self.findMoves(tuple([r1]*i),player,(),moves)
+                i -= 1
+        else:
+            self.findMoves(roll,player,(),moves)
+            self.findMoves((r2,r1),player,(),moves)
+            # has no moves, try moving only one piece
+            if not moves:
+                for r in roll:
+                    self.findMoves((r,),player,(),moves)
 
         return moves
+
+    def findMoves(self,rs,player,move,moves):
+        if len(rs)==0:
+            moves.add(move)
+            return
+        r,rs = rs[0],rs[1:]
+        # see if we can remove a piece from the bar
+        if self.barPieces[player]:
+            if self.can_onboard(player,r):
+                piece = self.barPieces[player].pop()
+                self.grid[r-1].append(piece)
+                self.findMoves(rs,player,move+((ON,r-1),),moves)
+                self.grid[r-1].pop()
+                self.barPieces[player].append(piece)
+
+            return
+
+        # otherwise check each grid location for valid move using r
+        offboarding = self.can_offboard(player)
+
+        for i in range(len(self.grid)):
+            if self.is_valid_move(i,i+r,player):
+
+                piece = self.grid[i].pop()
+                bar_piece = None
+                if len(self.grid[i+r])==1 and self.grid[i+r][-1]!=player:
+                    bar_piece = self.grid[i+r].pop()
+                self.grid[i+r].append(piece)
+                self.findMoves(rs,player,move+((i,i+r),),moves)
+                self.grid[i+r].pop()
+                self.grid[i].append(piece)
+                if bar_piece:
+                    self.grid[i+r].append(bar_piece)
+
+            # If we can't move on the board can we take the piece off?
+            if offboarding and self.remove_piece(player,i,r):
+                piece = self.grid[i].pop()
+                self.offPieces[player].append(piece)
+                self.findMoves(rs,player,move+((i,OFF),),moves)
+                self.offPieces[player].pop()
+                self.grid[i].append(piece)
 
     def opponent(self,token):
         """
@@ -163,85 +180,45 @@ class Game:
         for t in self.players:
             if len(self.offPieces[t])==self.numPieces[t]:
                 return True
-         
         return False
 
-    def get_second_move(self,token,r2,moves,move1,offboarding=None):
-        if not offboarding:
-            offboarding = self.can_offboard(token)
-        for j in range(len(self.grid)):
-            if offboarding and self.remove_piece(token,j,r2):
-                move2 = (j,OFF)
-                moves.add((move1,move2))
-                
-            if self.is_valid_move(j,j+r2,token):
-                move2 = (j,j+r2)
-                moves.add((move1,move2))
-
-    def can_offboard(self,token):
-        if token==self.players[1]:
-            start=0
-            end=self.die
-        else:
-            start=len(self.grid)-self.die
-            end=len(self.grid)
-
+    def can_offboard(self,player):
         count = 0
-        for i in range(start,end):
-            if len(self.grid[i])>0 and self.grid[i][0]==token:
+        for i in range(NUMCOLS-self.die,NUMCOLS):
+            if len(self.grid[i])>0 and self.grid[i][0]==player:
                 count += len(self.grid[i])
-        if count+len(self.offPieces[token]) == self.numPieces[token]:
+        if count+len(self.offPieces[player]) == self.numPieces[player]:
             return True
         return False
 
-    def remove_piece(self,token,start,r):
-        if token==self.players[0] and start < len(self.grid)-self.die:
-            return False
-        if token==self.players[1] and start >= self.die:
-            return False
-        if len(self.grid[start]) == 0 or self.grid[start][0] != token:
+    def can_onboard(self,player,r):
+        """
+        Can we take a players piece on the bar to a position
+        on the grid given by roll-1?
+        """
+        if len(self.grid[r-1])<=1 or self.grid[r-1][0]==player:
+            return True
+        else:
             return False
 
-        if token==self.players[1]:
-            if start+r==-1:
-                return True
-            if start+r<-1:
-                for i in range(start+1,self.die):
-                    if len(self.grid[i]) != 0 and self.grid[i][0]==self.players[1]:
-                        return False
-                return True
-        if token==self.players[0]:
-            if start+r == len(self.grid):
-                return True
-            if start+r > len(self.grid):
-                for i in range(start-1,len(self.grid)-self.die-1,-1):
-                    if len(self.grid[i]) != 0 and self.grid[i][0]==self.players[0]:
-                        return False
-                return True
+    def remove_piece(self,player,start,r):
+        """
+        Can we remove a piece from location start with roll r ?
+        In this function we assume we are cool to offboard,
+        i.e. no pieces on the bar and all are in the home quadrant.
+        """
+        if start < NUMCOLS - self.die:
+            return False
+        if len(self.grid[start]) == 0 or self.grid[start][0] != player:
+            return False
+        if start+r == NUMCOLS:
+            return True
+        if start+r > NUMCOLS:
+            for i in range(start-1,NUMCOLS-self.die-1,-1):
+                if len(self.grid[i]) != 0 and self.grid[i][0]==self.players[0]:
+                    return False
+            return True
         return False
-
-    def onboard_piece(self,moves,player,r1,r2):
-        start = -1
-        if player==self.players[1]:
-            start = NUMCOLS
-        piece = self.barPieces[player].pop()
-        if len(self.grid[start+r1])<=1 or self.grid[start+r1][0]==player:
-            move1 = (ON,start+r1)
-            self.grid[start+r1].append(piece)
-            if self.barPieces[player]:
-                if len(self.grid[start+r2])<=1 or self.grid[start+r2][0]==player:
-                    move2 = (ON,start+r2)
-                    moves.add((move1,move2))
-                else:
-                    moves.add((move1,))
-            else:
-                for j in range(NUMCOLS):
-                    if self.is_valid_move(j,j+r2,player):
-                        move2 = (j,j+r2)
-                        moves.add((move1,move2))
-            self.grid[start+r1].pop()
-        self.barPieces[player].append(piece)
-
 
     def is_valid_move(self,start,end,token):
         if len(self.grid[start]) > 0 and self.grid[start][0] == token:
@@ -267,8 +244,9 @@ class Game:
         else:
             print "  ",
 
-    def draw(self):
+    def draw(self,roll):
         os.system('clear')
+        self.drawGui(roll)
         largest = max([len(self.grid[i]) for i in range(len(self.grid)/2,len(self.grid))])
         for i in range(-2,largest):
             for col in range(len(self.grid)/2,len(self.grid)):
@@ -290,7 +268,111 @@ class Game:
                 print t+'',
             print
 
+    def initGui(self):
+        pygame.init()
+        WIDTH = 800
+        HEIGHT = 425
+        
+        WOFFSET_TOP = 57
+        HOFFSET_TOP = 12
+        HOFFSET_BOT = 370
+        WSKIP = 55
+        WMID = 32
+
+        HSKIP = 30
+        size = WIDTH,HEIGHT
+
+        self.gridLocs = []
+
+        for i in range(24):
+            mid = 0
+            hoff = HOFFSET_TOP
+            hskip = HSKIP
+            k = 11-i
+            if i < 6 or i>17:
+                mid = WMID
+            if i > 11:
+                hoff = HOFFSET_BOT
+                hskip = -hskip
+                k = i-12
+            self.gridLocs.append([(WOFFSET_TOP+k*WSKIP+mid,hoff+j*hskip) for j in range(6)])
+        self.barLocs = {'x':[(376,142),(376,110)],'o':[(376,243),(376,275)]}
+        self.board_img = pygame.transform.scale(pygame.image.load('images/board.png'),size)
+        self.screen = pygame.display.set_mode(self.board_img.get_rect().size)
+        self.tokIms = {'x':pygame.image.load('images/blackPiece.png'), \
+                           'o':pygame.image.load('images/whitePiece.png')}
+        self.dies = [pygame.transform.scale(pygame.image.load('images/die%d.png'%i),(35,35)) \
+                         for i in range(1,7)]
+        self.offIms = {'x':pygame.transform.scale(pygame.image.load('images/blackOff.png'),(40,18)), \
+                           'o':pygame.transform.scale(pygame.image.load('images/whiteOff.png'),(40,18))}
+        
+        outOff = 748
+        bOffH = 391
+        wOffH = 11
+        offSkip = 9
+        self.offLocs = {'x':[(outOff,bOffH-i*offSkip) for i in range(19)], \
+                            'o':[(outOff,wOffH+i*offSkip) for i in range(19)]}
+        
+    def drawGui(self,roll):
+        self.screen.blit(self.board_img,self.board_img.get_rect())
+        self.screen.blit(self.dies[roll[0]-1],(180,190))
+        self.screen.blit(self.dies[roll[1]-1],(220,190))
+        for i,col in enumerate(self.grid):
+            for j,t in enumerate(col):
+                # for now only draw first 6 pieces
+                if j>5:
+                    break
+                self.screen.blit(self.tokIms[t],self.gridLocs[23-i][j])
+        for k,v in self.barPieces.items():
+            for i,t in enumerate(v):
+                if i>1:
+                    break
+                self.screen.blit(self.tokIms[t],self.barLocs[t][i])
+
+        for k,v in self.offPieces.items():
+            for i,t in enumerate(v):
+                self.screen.blit(self.offIms[t],self.offLocs[t][i])
+        pygame.display.flip()
+
+    def pieceToMove(self,pos,player):
+        # loop over grid and look at last pieces
+        # if piece belongs to player, check if pos makes sense
+        # loop over players bar pieces
+        # otherwise return false
+        print pos,player
+        sizex,sizey = self.tokIms['x'].get_rect().size
+        def onPiece(pieceLoc,pos):
+            print pieceLoc,pos,sizex,sizey
+            px,py = pieceLoc
+            tx,ty = pos
+            print (px+sizex,py+sizey)
+            if tx < px+sizex and tx > px:
+                if ty < py+sizey and ty > py:
+                    print "GOT HERE?"
+                    return True
+            return False
+
+        for i,col in enumerate(self.grid):
+            if not col:
+                continue
+            print col
+            if col[-1]==player:
+                if onPiece(self.gridLocs[23-i][len(col)-1],pos):
+                    return True,i
+        for i,bp in enumerate(self.barPieces[player]):
+            if onPiece(self.barLocs[player][i],pos):
+                return True,"ON"
+        return False,None
+
+    def onMoveSpot(self,pos,player,openSpots):
+        print pos
+        print player
+        # get position on board of pos (off, or which col)
+        # check if makes sense for player to move piece to that place
+        # given set of openSpots
+        
+
 if __name__=='__main__':
     g = Game(LAYOUT)
     g.new_game()
-    g.draw()
+    g.draw((4,3))
