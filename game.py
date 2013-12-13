@@ -35,7 +35,7 @@ class Game:
             self.offPieces[t] = []
             self.numPieces[t] = 0
         self.initGui()
-
+        self.roll = None
     TOKENS = ['o','x']
             
     def clone(self):
@@ -244,9 +244,8 @@ class Game:
         else:
             print "  ",
 
-    def draw(self,roll):
+    def drawScreen(self):
         os.system('clear')
-        self.drawGui(roll)
         largest = max([len(self.grid[i]) for i in range(len(self.grid)/2,len(self.grid))])
         for i in range(-2,largest):
             for col in range(len(self.grid)/2,len(self.grid)):
@@ -267,6 +266,14 @@ class Game:
             for piece in self.barPieces[t]:
                 print t+'',
             print
+
+    def draw(self,roll=None):
+        if roll is None:
+            roll = self.roll
+        else:
+            self.roll = roll
+
+        self.drawGui(roll)
 
     def initGui(self):
         pygame.init()
@@ -334,43 +341,37 @@ class Game:
                 self.screen.blit(self.offIms[t],self.offLocs[t][i])
         pygame.display.flip()
 
-    def pieceToMove(self,pos,player):
-        # loop over grid and look at last pieces
-        # if piece belongs to player, check if pos makes sense
-        # loop over players bar pieces
-        # otherwise return false
-        print pos,player
-        sizex,sizey = self.tokIms['x'].get_rect().size
-        def onPiece(pieceLoc,pos):
-            print pieceLoc,pos,sizex,sizey
+
+    def gridLocFromPos(self,pos,player):
+        tx,ty = self.tokIms['x'].get_rect().size
+
+        def onPiece(pieceLoc,pos,sizex,sizey):
             px,py = pieceLoc
             tx,ty = pos
-            print (px+sizex,py+sizey)
             if tx < px+sizex and tx > px:
                 if ty < py+sizey and ty > py:
-                    print "GOT HERE?"
                     return True
             return False
-
+            
+        # find out if we are on the grid
         for i,col in enumerate(self.grid):
-            if not col:
-                continue
-            print col
-            if col[-1]==player:
-                if onPiece(self.gridLocs[23-i][len(col)-1],pos):
-                    return True,i
-        for i,bp in enumerate(self.barPieces[player]):
-            if onPiece(self.barLocs[player][i],pos):
-                return True,"ON"
-        return False,None
+            for loc in self.gridLocs[23-i]:
+                if onPiece(loc,pos,tx,ty):
+                    return i
 
-    def onMoveSpot(self,pos,player,openSpots):
-        print pos
-        print player
-        # get position on board of pos (off, or which col)
-        # check if makes sense for player to move piece to that place
-        # given set of openSpots
+        # find out if we are on the bar
+        for i,bp in enumerate(self.barPieces[player]):
+            if onPiece(self.barLocs[player][i],pos,tx,ty):
+                return ON
+
+        # find out if we are removing pieces
+        offBase = self.offLocs['o'][0] if player=='o' else self.offLocs['x'][-1]
+        offHeight = 200
+        offWidth,_ = self.offIms['x'].get_rect().size
+        if onPiece(offBase,pos,offWidth,offHeight):
+            return OFF
         
+        return None
 
 if __name__=='__main__':
     g = Game(LAYOUT)
