@@ -34,7 +34,7 @@ class Game:
             self.barPieces[t] = []
             self.offPieces[t] = []
             self.numPieces[t] = 0
-        self.initGui()
+        self.init = True
         self.roll = None
     TOKENS = ['o','x']
             
@@ -321,6 +321,8 @@ class Game:
                             'o':[(outOff,wOffH+i*offSkip) for i in range(19)]}
         
     def drawGui(self,roll):
+        if self.init:
+            self.initGui()
         self.screen.blit(self.board_img,self.board_img.get_rect())
         self.screen.blit(self.dies[roll[0]-1],(180,190))
         self.screen.blit(self.dies[roll[1]-1],(220,190))

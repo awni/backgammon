@@ -4,7 +4,6 @@ import agent, random, aiAgents
 import numpy as np
 
 def train(numGames=2000):
-    alpha = 1e-1
     numFeats = game.NUMCOLS*2*3+7
     gamma = 0.7
     alpha = 0.1
