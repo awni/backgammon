@@ -171,7 +171,7 @@ class Game:
         """
         Get winner.
         """
-        return self.offPieces[self.players[0]]==self.numPieces[self.players[0]]
+        return len(self.offPieces[self.players[0]])==self.numPieces[self.players[0]]
 
     def is_over(self):
         """

@@ -18,7 +18,7 @@ def train(numGames=2000):
 
         g = game.Game(game.LAYOUT)
         players = [aiAgents.TDAgent(g.players[0],weights,gamma,True), 
-                   aiAgents.TDAgent(g.players[1],weights,gamma,False)]
+                   aiAgents.TDAgent(g.players[1],weights)]
 
         winner = run_game(players,g)
 
@@ -39,12 +39,16 @@ def train(numGames=2000):
     return weights
 
 def test(players,numGames=100,draw=False):
+    import time
     winners = [0,0]
     for _ in xrange(numGames):
         g = game.Game(game.LAYOUT)
         winner = run_game(players,g,draw)
-        print "The winner is : Player %s"%players[winner].player
+        print "The winner is : Player %s"%players[not winner].player
         winners[winner]+=1
+        if draw:
+            g.draw()
+            time.sleep(10)
     print "Summary:"
     print "Player %s : %d/%d"%(players[0].player,winners[0],sum(winners))
     print "Player %s : %d/%d"%(players[1].player,winners[1],sum(winners))
@@ -65,8 +69,7 @@ def run_game(players,g,draw=False):
             g.reverse()
         over = g.is_over()
         if draw:
-            time.sleep(1)
-
+            time.sleep(.02)
     return g.winner()
 
 def turn(player,g,roll,draw=False):
@@ -109,27 +112,30 @@ def main(args=None):
     (opts,args) = parser.parse_args(args)    
 
     weights = None
+
     if opts.train:
         weights = train()
         
     if opts.eval:
         weights = load_weights(weights)
         evalArgs = weights
-    else:
-        evalArgs = None
+        evalFn = aiAgents.nnetEval
         
     p1 = None
     if opts.player1 == 'random':
         p1 = agent.RandomAgent(game.Game.TOKENS[0])
     elif opts.player1 == 'reflex':
-        p1 = aiAgent.TDAgent(game.Game.TOKENS[0],evalArgs)
+        p1 = aiAgents.TDAgent(game.Game.TOKENS[0],evalArgs)
     elif opts.player1 == 'expectimax':
-        p1 = aiAgent.ExpectimaxAgent(game.Game.TOKENS[0],evalFn,evalArgs)
+        p1 = aiAgents.ExpectimaxAgent(game.Game.TOKENS[0],evalFn,evalArgs)
+    elif opts.player1 == 'expectiminimax':
+        p1 = aiAgents.ExpectiMiniMaxAgent(game.Game.TOKENS[0],evalFn,evalArgs)
     elif opts.player1 == 'human':
         p1 = agent.HumanAgent(game.Game.TOKENS[0])
+    print game.Game.TOKENS
 
     p2 = agent.RandomAgent(game.Game.TOKENS[1])
-
+#    p2 = aiAgents.ExpectiMiniMaxAgent(game.Game.TOKENS[1],evalFn,evalArgs)
     if p1 is None:
         print "Please specify legitimate player"
         import sys

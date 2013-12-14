@@ -28,7 +28,7 @@ def extractFeatures(state):
 
 class TDAgent(agent.Agent, object):
 
-    def __init__(self, player, weights, gamma, update):
+    def __init__(self, player, weights, gamma=None, update=False):
         super(self.__class__, self).__init__(player)
         self.w1,self.w2,self.b1,self.b2 = weights
         self.gamma = gamma
@@ -85,6 +85,14 @@ class TDAgent(agent.Agent, object):
                 update += currdiff*gradsum
         return updates
 
+
+def nnetEval(state,weights):
+    w1,w2,b1,b2 = weights
+    features = np.array(extractFeatures(state)).reshape(-1,1)
+    hiddenAct = 1/(1+np.exp(-(w1.dot(features)+b1)))
+    v = 1/(1+np.exp(-(w2.dot(hiddenAct)+b2)))
+
+
 class ExpectimaxAgent(agent.Agent, object):
 
     def getAction(self, actions, game):
@@ -111,6 +119,59 @@ class ExpectimaxAgent(agent.Agent, object):
             tmpGame = game.clone()
             tmpGame.takeAction(a,self.player)
             score = computeV(tmpGame,game.opponent(self.player))
+            outcomes.append((score, a))
+        action = max(outcomes)[1]
+        return action
+
+
+    def __init__(self, player, evalFn, evalArgs=None):
+        super(self.__class__, self).__init__(player)
+        self.evaluationFunction = evalFn
+        self.evaluationArgs = evalArgs
+
+class ExpectiMiniMaxAgent(agent.Agent, object):
+
+    def allDiceRolls(game):
+        # Helper function to return all possible dice rolls for a game object
+        return [(i, j) for i in range(1, game.die + 1) for j in range(1, game.die + 1)]
+
+    def miniMaxNode(game,player,roll,depth):
+        actions = game.getActions(roll,player)
+        rollScores = []
+
+        if player==self.player:
+            scoreFn = max
+        else:
+            scoreFn = min
+            depth -= 1
+
+        if not actions:
+            return expectiNode(tmpGame,game.opponent(player),depth)
+
+        for a in actions:
+            tmpGame = game.clone()
+            tmpGame.takeAction(a,player)
+            rollScores.append(expectiNode(tmpGame,game.opponent(player),depth))
+
+        return scoreFn(rollScores)
+
+    def expectiNode(game,player,depth):
+        if depth==0:
+            return self.evaluationFunction((game,player),self.evaluationArgs)
+
+        total = 0
+        for roll in allDiceRolls(game):
+            total += miniMaxNode(game,player,roll,depth)
+
+        return total/float(game.die**2)
+
+    def getAction(self, actions, game):
+        depth = 1
+        outcomes = []
+        for a in actions:
+            tmpGame = game.clone()
+            tmpGame.takeAction(a,self.player)
+            score = expectiNode(tmpGame,game.opponent(self.player),depth)
             outcomes.append((score, a))
         action = max(outcomes)[1]
         return action
