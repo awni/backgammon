@@ -1,8 +1,13 @@
 import random
 import game as gamemod
 import numpy as np
-import pygame
-from pygame.locals import *
+
+try:
+    import pygame
+    from pygame.locals import *
+except:
+    print "No module pygame, use command line to play"
+
 import copy
 
 OFF = gamemod.OFF

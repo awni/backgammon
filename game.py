@@ -1,5 +1,8 @@
 import os, sys
-import pygame
+try:
+    import pygame
+except:
+    print "No module pygame, use screen drawing"
 
 LAYOUT = "0-2-o,5-5-x,7-3-x,11-5-o,12-5-x,16-3-o,18-5-o,23-2-x"
 

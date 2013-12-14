@@ -2,17 +2,16 @@ import time
 import game
 import agent, random, aiAgents
 import numpy as np
+import pickle
 
-def train(numGames=2000):
-    numFeats = game.NUMCOLS*2*3+7
+def train(numGames=200000):
     gamma = 0.7
     alpha = 0.1
-    numFeats = 199
-    numHidden = 40
-    maxIter = 4000
-    weights = [1e-2*np.random.randn(numHidden,numFeats),1e-2*np.random.randn(1,numHidden),
-               np.zeros((numHidden,1)),np.zeros((1,1))] 
-
+    numFeats = (game.NUMCOLS*4+3)*2+1
+    numHidden = 50
+    scales = [np.sqrt(6./(numFeats+numHidden)), np.sqrt(6./(1+numHidden))]
+    weights = [scales[0]*np.random.randn(numHidden,numFeats),scales[1]*np.random.randn(1,numHidden),
+               np.zeros((numHidden,1)),np.zeros((1,1))]    
 
     for it in xrange(numGames):
 
@@ -30,12 +29,12 @@ def train(numGames=2000):
         updates = players[0].computeUpdate(winner)
         for w,update in zip(weights,updates):
             w = w+alpha*update
+        if it%100 == 0:
+            # save weights
+            fid = open("weights.bin",'w')
+            pickle.dump(weights,fid)
+            fid.close()
 
-    # save weights
-    fid = open("weights.bin",'w')
-    import pickle
-    pickle.dump(weights,fid)
-    fid.close()
     return weights
 
 def test(players,numGames=100,draw=False):
