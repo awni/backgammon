@@ -99,10 +99,17 @@ class Game:
         if self.barPieces[player]:
             if self.can_onboard(player,r):
                 piece = self.barPieces[player].pop()
+                bar_piece = None
+                if len(self.grid[r-1])==1 and self.grid[r-1][-1]!=player:
+                    bar_piece = self.grid[r-1].pop()
+
                 self.grid[r-1].append(piece)
+
                 self.findMoves(rs,player,move+((ON,r-1),),moves)
                 self.grid[r-1].pop()
                 self.barPieces[player].append(piece)
+                if bar_piece:
+                    self.grid[r-1].append(bar_piece)
 
             return
 

@@ -131,7 +131,6 @@ def main(args=None):
         p1 = aiAgents.ExpectiMiniMaxAgent(game.Game.TOKENS[0],evalFn,evalArgs)
     elif opts.player1 == 'human':
         p1 = agent.HumanAgent(game.Game.TOKENS[0])
-    print game.Game.TOKENS
 
     p2 = agent.RandomAgent(game.Game.TOKENS[1])
 #    p2 = aiAgents.ExpectiMiniMaxAgent(game.Game.TOKENS[1],evalFn,evalArgs)

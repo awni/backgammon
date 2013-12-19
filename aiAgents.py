@@ -91,7 +91,7 @@ def nnetEval(state,weights):
     features = np.array(extractFeatures(state)).reshape(-1,1)
     hiddenAct = 1/(1+np.exp(-(w1.dot(features)+b1)))
     v = 1/(1+np.exp(-(w2.dot(hiddenAct)+b2)))
-
+    return v
 
 class ExpectimaxAgent(agent.Agent, object):
 
@@ -131,11 +131,7 @@ class ExpectimaxAgent(agent.Agent, object):
 
 class ExpectiMiniMaxAgent(agent.Agent, object):
 
-    def allDiceRolls(game):
-        # Helper function to return all possible dice rolls for a game object
-        return [(i, j) for i in range(1, game.die + 1) for j in range(1, game.die + 1)]
-
-    def miniMaxNode(game,player,roll,depth):
+    def miniMaxNode(self,game,player,roll,depth):
         actions = game.getActions(roll,player)
         rollScores = []
 
@@ -146,23 +142,27 @@ class ExpectiMiniMaxAgent(agent.Agent, object):
             depth -= 1
 
         if not actions:
-            return expectiNode(tmpGame,game.opponent(player),depth)
-
+            return self.expectiNode(tmpGame,game.opponent(player),depth)
         for a in actions:
             tmpGame = game.clone()
             tmpGame.takeAction(a,player)
-            rollScores.append(expectiNode(tmpGame,game.opponent(player),depth))
-
+            rollScores.append(self.expectiNode(tmpGame,game.opponent(player),depth))
+            
         return scoreFn(rollScores)
 
-    def expectiNode(game,player,depth):
+    def expectiNode(self,game,player,depth):
         if depth==0:
             return self.evaluationFunction((game,player),self.evaluationArgs)
 
         total = 0
-        for roll in allDiceRolls(game):
-            total += miniMaxNode(game,player,roll,depth)
-
+        for i in range(1,game.die+1):
+            for j in range(i+1,game.die+1):
+                score = self.miniMaxNode(game,player,(i,j),depth)
+                if i==j:
+                    total += score
+                else:
+                    total += 2*score
+            
         return total/float(game.die**2)
 
     def getAction(self, actions, game):
@@ -171,7 +171,7 @@ class ExpectiMiniMaxAgent(agent.Agent, object):
         for a in actions:
             tmpGame = game.clone()
             tmpGame.takeAction(a,self.player)
-            score = expectiNode(tmpGame,game.opponent(self.player),depth)
+            score = self.expectiNode(tmpGame,game.opponent(self.player),depth)
             outcomes.append((score, a))
         action = max(outcomes)[1]
         return action
