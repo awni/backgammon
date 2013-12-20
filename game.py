@@ -1,4 +1,5 @@
 import os, sys
+import copy
 try:
     import pygame
 except:
@@ -21,7 +22,6 @@ class Game:
         self.die = QUAD
         self.layout = layout
         if grid:
-            import copy
             self.grid = copy.deepcopy(grid)
             self.offPieces = copy.deepcopy(offPieces)
             self.barPieces = copy.deepcopy(barPieces)
@@ -54,7 +54,8 @@ class Game:
         Makes given move for player, assumes move is valid, 
         will remove pieces from play
         """
-        for s,e in action:
+        self.atePiece = [0]*4
+        for i,(s,e) in enumerate(action):
             if s==ON:
                 piece = self.barPieces[token].pop()
             else:
@@ -65,7 +66,27 @@ class Game:
             if len(self.grid[e])>0 and self.grid[e][0] != token:
                 bar_piece = self.grid[e].pop()
                 self.barPieces[bar_piece].append(bar_piece)
+                self.atePiece[i] = 1
             self.grid[e].append(piece)
+
+    def undoAction(self,action,player):
+        """
+        Reverses given move for player, assumes move is valid, 
+        will remove pieces from play
+        """
+        for i,(s,e) in enumerate(reversed(action)):
+            if e==OFF:
+                piece = self.offPieces[player].pop()
+            else:
+                piece = self.grid[e].pop()
+                if self.atePiece[len(action)-1-i]:
+                    bar_piece = self.barPieces[self.opponent(player)].pop()
+                    self.grid[e].append(bar_piece)
+            if s==ON:
+                self.barPieces[player].append(piece)
+            else:
+                self.grid[s].append(piece)
+
 
     def getActions(self,roll,player):
         """

@@ -4,7 +4,7 @@ import agent, random, aiAgents
 import numpy as np
 import pickle
 
-def train(numGames=200000):
+def train(numGames=10):
     gamma = 0.7
     alpha = 0.1
     numFeats = (game.NUMCOLS*4+3)*2+1

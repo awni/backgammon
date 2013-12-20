@@ -2,20 +2,15 @@ import agent
 import numpy as np
 
 def extractFeatures(state):
-
-    def extractColumnFeatures(column,player):
-        feats = [0.]*4
-        if len(column)>0 and column[0]==player:
-            for i in range(len(column)):
-                feats[min(i,3)] += 1
-            feats[-1] = feats[-1]/2.
-        return feats
-
     game,player = state
     features = []
     for p in game.players:
         for col in game.grid:
-            feats = extractColumnFeatures(col,p)
+            feats = [0.]*4
+            if len(col)>0 and col[0]==player:
+                for i in xrange(len(col)):
+                    feats[min(i,3)] += 1
+                feats[-1] = feats[-1]/2.
             features += feats
         features.append(float(len(game.barPieces[p]))/2.)
         features.append(float(len(game.offPieces[p]))/game.numPieces[p])
@@ -50,9 +45,8 @@ class TDAgent(agent.Agent, object):
             self.V.append(v)
 
         for a in actions:
-            tmpGame = game.clone()
-            tmpGame.takeAction(a,self.player)
-            features = np.array(extractFeatures((tmpGame,game.opponent(self.player)))).reshape(-1,1)
+            game.takeAction(a,self.player)
+            features = np.array(extractFeatures((game,game.opponent(self.player)))).reshape(-1,1)
             hiddenAct = 1/(1+np.exp(-(self.w1.dot(features)+self.b1)))
             v = 1/(1+np.exp(-(self.w2.dot(hiddenAct)+self.b2)))
             if v>bestV:
@@ -60,6 +54,8 @@ class TDAgent(agent.Agent, object):
                 bestFeats = features
                 bestAct = hiddenAct.copy()
                 bestV = v
+            game.undoAction(a,self.player)
+
         if self.update:
             self.grads.append(self.backprop(bestFeats,bestAct,bestV))
             self.V.append(bestV)
@@ -107,18 +103,18 @@ class ExpectimaxAgent(agent.Agent, object):
                 actions = game.getActions(roll,player)
                 rollTotal = 0.
                 for a in actions:
-                    tmpGame = game.clone()
-                    tmpGame.takeAction(a,player)
-                    rollTotal += self.evaluationFunction((tmpGame,self.player),self.evaluationArgs)
+                    game.takeAction(a,player)
+                    rollTotal += self.evaluationFunction((game,self.player),self.evaluationArgs)
+                    game.undoAction(a,player)
                 if actions:
                     total += rollTotal/float(len(actions))
             return total/float(game.die**2)
 
         outcomes = []
         for a in actions:
-            tmpGame = game.clone()
-            tmpGame.takeAction(a,self.player)
-            score = computeV(tmpGame,game.opponent(self.player))
+            game.takeAction(a,self.player)
+            score = computeV(game,game.opponent(self.player))
+            game.undoAction(a,self.player)
             outcomes.append((score, a))
         action = max(outcomes)[1]
         return action
@@ -142,12 +138,12 @@ class ExpectiMiniMaxAgent(agent.Agent, object):
             depth -= 1
 
         if not actions:
-            return self.expectiNode(tmpGame,game.opponent(player),depth)
+            return self.expectiNode(game,game.opponent(player),depth)
         for a in actions:
-            tmpGame = game.clone()
-            tmpGame.takeAction(a,player)
-            rollScores.append(self.expectiNode(tmpGame,game.opponent(player),depth))
-            
+            game.takeAction(a,player)
+            rollScores.append(self.expectiNode(game,game.opponent(player),depth))
+            game.undoAction(a,player)
+
         return scoreFn(rollScores)
 
     def expectiNode(self,game,player,depth):
@@ -169,9 +165,9 @@ class ExpectiMiniMaxAgent(agent.Agent, object):
         depth = 1
         outcomes = []
         for a in actions:
-            tmpGame = game.clone()
-            tmpGame.takeAction(a,self.player)
-            score = self.expectiNode(tmpGame,game.opponent(self.player),depth)
+            game.takeAction(a,self.player)
+            score = self.expectiNode(game,game.opponent(self.player),depth)
+            game.undoAction(a,self.player)
             outcomes.append((score, a))
         action = max(outcomes)[1]
         return action
