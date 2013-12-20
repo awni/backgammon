@@ -54,7 +54,7 @@ class Game:
         Makes given move for player, assumes move is valid, 
         will remove pieces from play
         """
-        self.atePiece = [0]*4
+        ateList = [0]*4
         for i,(s,e) in enumerate(action):
             if s==ON:
                 piece = self.barPieces[token].pop()
@@ -66,10 +66,11 @@ class Game:
             if len(self.grid[e])>0 and self.grid[e][0] != token:
                 bar_piece = self.grid[e].pop()
                 self.barPieces[bar_piece].append(bar_piece)
-                self.atePiece[i] = 1
+                ateList[i] = 1
             self.grid[e].append(piece)
+        return ateList
 
-    def undoAction(self,action,player):
+    def undoAction(self,action,player,ateList):
         """
         Reverses given move for player, assumes move is valid, 
         will remove pieces from play
@@ -79,7 +80,7 @@ class Game:
                 piece = self.offPieces[player].pop()
             else:
                 piece = self.grid[e].pop()
-                if self.atePiece[len(action)-1-i]:
+                if ateList[len(action)-1-i]:
                     bar_piece = self.barPieces[self.opponent(player)].pop()
                     self.grid[e].append(bar_piece)
             if s==ON:
@@ -88,30 +89,34 @@ class Game:
                 self.grid[s].append(piece)
 
 
-    def getActions(self,roll,player):
+    def getActions(self,roll,player,nodups=False):
         """
         Get set of all possible move tuples
         """
         moves = set()
+        if nodups:
+            start=0
+        else:
+            start=None
 
         r1,r2 = roll
         if r1 == r2: # doubles
             i = 4
             # keep trying until we find some moves
             while not moves and i>0:
-                self.findMoves(tuple([r1]*i),player,(),moves)
+                self.findMoves(tuple([r1]*i),player,(),moves,start)
                 i -= 1
         else:
-            self.findMoves(roll,player,(),moves)
-            self.findMoves((r2,r1),player,(),moves)
+            self.findMoves(roll,player,(),moves,start)
+            self.findMoves((r2,r1),player,(),moves,start)
             # has no moves, try moving only one piece
             if not moves:
                 for r in roll:
-                    self.findMoves((r,),player,(),moves)
+                    self.findMoves((r,),player,(),moves,start)
 
         return moves
 
-    def findMoves(self,rs,player,move,moves):
+    def findMoves(self,rs,player,move,moves,start=None):
         if len(rs)==0:
             moves.add(move)
             return
@@ -126,7 +131,7 @@ class Game:
 
                 self.grid[r-1].append(piece)
 
-                self.findMoves(rs,player,move+((ON,r-1),),moves)
+                self.findMoves(rs,player,move+((ON,r-1),),moves,start)
                 self.grid[r-1].pop()
                 self.barPieces[player].append(piece)
                 if bar_piece:
@@ -138,6 +143,8 @@ class Game:
         offboarding = self.can_offboard(player)
 
         for i in range(len(self.grid)):
+            if start is not None:
+                start = i
             if self.is_valid_move(i,i+r,player):
 
                 piece = self.grid[i].pop()
@@ -145,7 +152,7 @@ class Game:
                 if len(self.grid[i+r])==1 and self.grid[i+r][-1]!=player:
                     bar_piece = self.grid[i+r].pop()
                 self.grid[i+r].append(piece)
-                self.findMoves(rs,player,move+((i,i+r),),moves)
+                self.findMoves(rs,player,move+((i,i+r),),moves,start)
                 self.grid[i+r].pop()
                 self.grid[i].append(piece)
                 if bar_piece:
@@ -155,7 +162,7 @@ class Game:
             if offboarding and self.remove_piece(player,i,r):
                 piece = self.grid[i].pop()
                 self.offPieces[player].append(piece)
-                self.findMoves(rs,player,move+((i,OFF),),moves)
+                self.findMoves(rs,player,move+((i,OFF),),moves,start)
                 self.offPieces[player].pop()
                 self.grid[i].append(piece)
 

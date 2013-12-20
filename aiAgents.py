@@ -45,7 +45,7 @@ class TDAgent(agent.Agent, object):
             self.V.append(v)
 
         for a in actions:
-            game.takeAction(a,self.player)
+            ateList = game.takeAction(a,self.player)
             features = np.array(extractFeatures((game,game.opponent(self.player)))).reshape(-1,1)
             hiddenAct = 1/(1+np.exp(-(self.w1.dot(features)+self.b1)))
             v = 1/(1+np.exp(-(self.w2.dot(hiddenAct)+self.b2)))
@@ -54,7 +54,7 @@ class TDAgent(agent.Agent, object):
                 bestFeats = features
                 bestAct = hiddenAct.copy()
                 bestV = v
-            game.undoAction(a,self.player)
+            game.undoAction(a,self.player,ateList)
 
         if self.update:
             self.grads.append(self.backprop(bestFeats,bestAct,bestV))
@@ -89,46 +89,10 @@ def nnetEval(state,weights):
     v = 1/(1+np.exp(-(w2.dot(hiddenAct)+b2)))
     return v
 
-class ExpectimaxAgent(agent.Agent, object):
-
-    def getAction(self, actions, game):
-
-        def allDiceRolls(game):
-            # Helper function to return all possible dice rolls for a game object
-            return [(i, j) for i in range(1, game.die + 1) for j in range(1, game.die + 1)]
-
-        def computeV(game,player):
-            total = 0
-            for roll in allDiceRolls(game):
-                actions = game.getActions(roll,player)
-                rollTotal = 0.
-                for a in actions:
-                    game.takeAction(a,player)
-                    rollTotal += self.evaluationFunction((game,self.player),self.evaluationArgs)
-                    game.undoAction(a,player)
-                if actions:
-                    total += rollTotal/float(len(actions))
-            return total/float(game.die**2)
-
-        outcomes = []
-        for a in actions:
-            game.takeAction(a,self.player)
-            score = computeV(game,game.opponent(self.player))
-            game.undoAction(a,self.player)
-            outcomes.append((score, a))
-        action = max(outcomes)[1]
-        return action
-
-
-    def __init__(self, player, evalFn, evalArgs=None):
-        super(self.__class__, self).__init__(player)
-        self.evaluationFunction = evalFn
-        self.evaluationArgs = evalArgs
-
 class ExpectiMiniMaxAgent(agent.Agent, object):
 
     def miniMaxNode(self,game,player,roll,depth):
-        actions = game.getActions(roll,player)
+        actions = game.getActions(roll,player,nodups=True)
         rollScores = []
 
         if player==self.player:
@@ -140,9 +104,9 @@ class ExpectiMiniMaxAgent(agent.Agent, object):
         if not actions:
             return self.expectiNode(game,game.opponent(player),depth)
         for a in actions:
-            game.takeAction(a,player)
+            ateList = game.takeAction(a,player)
             rollScores.append(self.expectiNode(game,game.opponent(player),depth))
-            game.undoAction(a,player)
+            game.undoAction(a,player,ateList)
 
         return scoreFn(rollScores)
 
@@ -163,11 +127,13 @@ class ExpectiMiniMaxAgent(agent.Agent, object):
 
     def getAction(self, actions, game):
         depth = 1
+        if len(actions)>100:
+            depth = 0
         outcomes = []
         for a in actions:
-            game.takeAction(a,self.player)
+            ateList = game.takeAction(a,self.player)
             score = self.expectiNode(game,game.opponent(self.player),depth)
-            game.undoAction(a,self.player)
+            game.undoAction(a,self.player,ateList)
             outcomes.append((score, a))
         action = max(outcomes)[1]
         return action

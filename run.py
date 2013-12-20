@@ -74,7 +74,7 @@ def run_game(players,g,draw=False):
 def turn(player,g,roll,draw=False):
     if draw:
         print "Player %s rolled <%d,%d>."%(player.player,roll[0],roll[1])
-    moves = g.getActions(roll,g.players[0])
+    moves = g.getActions(roll,g.players[0],nodups=True)
     if moves:
         move = player.getAction(moves,g)
     else:
@@ -105,7 +105,7 @@ def main(args=None):
     parser.add_option("-n","--num",dest="numgames",default=1,help="Num games to play")
     parser.add_option("-p","--player1",dest="player1",
                       default="random",help="Choose type of first player")
-    parser.add_option("-e","--eval",dest="eval",action="store_true",default=False,
+    parser.add_option("-e","--eval",dest="eval",action="store_true",default=True,
                         help="Play with the better eval function for player")
 
     (opts,args) = parser.parse_args(args)    
