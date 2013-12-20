@@ -18,7 +18,6 @@ def extractFeatures(state):
         features += [1.,0.]
     else:
         features += [0.,1.]
-    features += [1.0] # bias
     return features
 
 class TDAgent(agent.Agent, object):
