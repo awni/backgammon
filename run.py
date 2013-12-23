@@ -22,9 +22,6 @@ def train(numGames=1):
 
         print "Game : %d/%d"%(it,numGames)
 
-        # flip outcome for training
-        winner = 1.0-winner
-
         updates = players[0].computeUpdate(winner)
         for w,update in zip(weights,updates):
             w += alpha*update
@@ -42,7 +39,7 @@ def test(players,numGames=100,draw=False):
         g = game.Game(game.LAYOUT)
         winner = run_game(players,g,draw)
         print "The winner is : Player %s"%players[not winner].player
-        winners[winner]+=1
+        winners[not winner]+=1
         if draw:
             g.draw()
             time.sleep(10)

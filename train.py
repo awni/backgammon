@@ -4,9 +4,8 @@ import agent, random, aiAgents
 import numpy as np
 import cPickle as pickle
 
-def train(numGames=100):
-    gamma = 0.1
-    alpha = 0.1
+def train(numGames=100000):
+    alpha = 1.0
     numFeats = (game.NUMCOLS*4+3)*2
     numHidden = 50
     scales = [np.sqrt(6./(numFeats+numHidden)), np.sqrt(6./(1+numHidden))]
@@ -16,17 +15,16 @@ def train(numGames=100):
                aiAgents.TDAgent(game.Game.TOKENS[1],weights)]
 
     for it in xrange(numGames):
-        if it==10:
-            gamma = 0.7
-        trace = [np.zeros(w.shape) for w in weights]
-
         g = game.Game(game.LAYOUT)
         g.new_game()
         playernum = random.randint(0,1)
         featsP = aiAgents.extractFeatures((g,players[playernum].player))
+        if it==500:
+	    alpha=.1
 
         over = False
-        while not over:
+        nt = 0
+        while True:
             roll = (random.randint(1,g.die), random.randint(1,g.die))
             if playernum:
                 g.reverse()
@@ -40,18 +38,18 @@ def train(numGames=100):
             if playernum:
                 g.reverse()
             playernum = (playernum+1)%2
+            nt += 1
             featsN = aiAgents.extractFeatures((g,players[playernum].player))
-            updateWeights(featsP,featsN,weights,trace,alpha,gamma)
+            updateWeights(featsP,featsN,weights,alpha)
+            if g.is_over():
+                break
             featsP = featsN
-            over = g.is_over()
 
         winner = g.winner()
 
-        print "Game : %d/%d"%(it,numGames)
+        print "Game : %d/%d in %d turns"%(it,numGames,nt)
 
-        # flip outcome for training
-        winner = 1.0-winner
-        updateWeights(featsP,featsN,weights,trace,alpha,gamma,w=winner)
+        updateWeights(featsP,featsN,weights,alpha,w=winner)
 
         if it%100 == 0:
             # save weights
@@ -74,7 +72,7 @@ def backprop(weights,a1,fpropOnly=False):
     del1 = w2.T*del2*a2*(1-a2)
     return v,[del1*a1.T,del2*a2.T,del1,del2]
 
-def updateWeights(featsP,featsN,weights,trace,alpha,gamma,w=None):
+def updateWeights(featsP,featsN,weights,alpha,w=None):
     # compute vals and grad
     vP,grad = backprop(weights,featsP)
     if w is None:
@@ -82,12 +80,9 @@ def updateWeights(featsP,featsN,weights,trace,alpha,gamma,w=None):
     else:
         vN = w
 
-    for tr,gr in zip(trace,grad):
-        tr += gamma*tr+gr
-        
     scale = alpha*(vN-vP)
-    for w,tr in zip(weights,trace):
-        w += scale*tr
+    for w,g in zip(weights,grad):
+        w += scale*g
 
 def load_weights(weights):
     if weights is None:
