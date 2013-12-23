@@ -6,11 +6,10 @@ def extractFeatures(state):
     features = []
     for p in game.players:
         for col in game.grid:
-            feats = [0.]*4
+            feats = [0.]*6
             if len(col)>0 and col[0]==p:
                 for i in xrange(len(col)):
-                    feats[min(i,3)] += 1
-                feats[-1] = feats[-1]/2.
+                    feats[min(i,5)] += 1
             features += feats
         features.append(float(len(game.barPieces[p]))/2.)
         features.append(float(len(game.offPieces[p]))/game.numPieces[p])

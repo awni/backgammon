@@ -4,9 +4,20 @@ import agent, random, aiAgents
 import numpy as np
 import cPickle as pickle
 
+def saveGames(gameData,fileNum):
+    feats = np.hstack(gameData['feats'])
+    info = np.vstack([np.array(gameData['winners']), np.array(gameData['length'])]).T
+    featId = open('gameFeats.0.%d'%fileNum,'w')
+    infoId = open('gameInfo.0.%d'%fileNum,'w')
+    feats.astype(np.float32).tofile(featId)
+    featId.close()
+    info.astype(np.int32).tofile(infoId)
+    print info
+    infoId.close()
+
 def train(numGames=100000):
     alpha = 1.0
-    numFeats = (game.NUMCOLS*4+3)*2
+    numFeats = (game.NUMCOLS*6+3)*2
     numHidden = 50
     scales = [np.sqrt(6./(numFeats+numHidden)), np.sqrt(6./(1+numHidden))]
     weights = [scales[0]*np.random.randn(numHidden,numFeats),scales[1]*np.random.randn(1,numHidden),
@@ -14,6 +25,7 @@ def train(numGames=100000):
     players = [aiAgents.TDAgent(game.Game.TOKENS[0],weights), 
                aiAgents.TDAgent(game.Game.TOKENS[1],weights)]
 
+    gameData = {'winners':[],'length':[],'feats':[]}
     for it in xrange(numGames):
         g = game.Game(game.LAYOUT)
         g.new_game()
@@ -38,14 +50,20 @@ def train(numGames=100000):
             if playernum:
                 g.reverse()
             playernum = (playernum+1)%2
-            nt += 1
             featsN = aiAgents.extractFeatures((g,players[playernum].player))
             updateWeights(featsP,featsN,weights,alpha)
             if g.is_over():
                 break
+	    gameData['feats'].append(featsP)
+            nt += 1
             featsP = featsN
 
         winner = g.winner()
+	gameData['winners'].append(winner)
+	gameData['length'].append(nt)
+	if (it+1)%10000==0:
+	    saveGames(gameData,it/10000)
+	    gameData = {'winners':[],'length':[],'feats':[]}
 
         print "Game : %d/%d in %d turns"%(it,numGames,nt)
 
