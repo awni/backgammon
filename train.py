@@ -4,18 +4,19 @@ import agent, random, aiAgents
 import numpy as np
 import cPickle as pickle
 
+NUM=2
+
 def saveGames(gameData,fileNum):
     feats = np.hstack(gameData['feats'])
     info = np.vstack([np.array(gameData['winners']), np.array(gameData['length'])]).T
-    featId = open('gameFeats.0.%d'%fileNum,'w')
-    infoId = open('gameInfo.0.%d'%fileNum,'w')
+    featId = open('gameFeats.%d.%d'%(NUM,fileNum),'w')
+    infoId = open('gameInfo.%d.%d'%(NUM,fileNum),'w')
     feats.astype(np.float32).tofile(featId)
     featId.close()
     info.astype(np.int32).tofile(infoId)
-    print info
     infoId.close()
 
-def train(numGames=100000):
+def train(numGames=1000000):
     alpha = 1.0
     numFeats = (game.NUMCOLS*6+3)*2
     numHidden = 50
@@ -71,7 +72,7 @@ def train(numGames=100000):
 
         if it%100 == 0:
             # save weights
-            fid = open("weights.bin",'w')
+            fid = open("weights%d.bin"%NUM,'w')
             pickle.dump(weights,fid)
             fid.close()
 
