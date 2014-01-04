@@ -4,7 +4,7 @@ import agent, random, aiAgents
 import numpy as np
 import cPickle as pickle
 
-NUM=2
+NUM=0
 
 def saveGames(gameData,fileNum):
     feats = np.hstack(gameData['feats'])
@@ -70,7 +70,7 @@ def train(numGames=1000000):
 
         updateWeights(featsP,featsN,weights,alpha,w=winner)
 
-        if it%100 == 0:
+	if it%10000 == 0:
             # save weights
             fid = open("weights%d.bin"%NUM,'w')
             pickle.dump(weights,fid)

@@ -68,8 +68,6 @@ def main(args=None):
         p1 = agent.RandomAgent(game.Game.TOKENS[0])
     elif opts.player1 == 'reflex':
         p1 = aiAgents.TDAgent(game.Game.TOKENS[0],evalArgs)
-    elif opts.player1 == 'expectimax':
-        p1 = aiAgents.ExpectimaxAgent(game.Game.TOKENS[0],evalFn,evalArgs)
     elif opts.player1 == 'expectiminimax':
         p1 = aiAgents.ExpectiMiniMaxAgent(game.Game.TOKENS[0],evalFn,evalArgs)
     elif opts.player1 == 'human':
